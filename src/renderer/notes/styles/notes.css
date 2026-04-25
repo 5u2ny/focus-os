@@ -1,0 +1,262 @@
+:root {
+  /* Liquid glass tokens */
+  --glass-bg:          rgba(255,255,255,0.07);
+  --glass-bg-deep:     rgba(10,10,16,0.85);
+  --glass-bg-raised:   rgba(255,255,255,0.06);
+  --glass-rim:         rgba(255,255,255,0.10);
+  --glass-rim-top:     rgba(255,255,255,0.22);
+  --glass-blur:        28px;
+  --glass-saturate:    180%;
+  --glass-specular:    rgba(255,255,255,0.14);
+
+  /* macOS design tokens */
+  --macos-bg:          #0a0a10;
+  --macos-text:        #ffffff;
+  --macos-subtext:     rgba(255,255,255,0.55);
+  --macos-dim:         rgba(255,255,255,0.25);
+  --macos-blue:        #0a84ff;
+  --macos-radius-sm:   8px;
+  --macos-radius-md:   12px;
+  --macos-radius-lg:   18px;
+  --ease-out-expo:     cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Legacy aliases for backward compat */
+  --bg:      var(--macos-bg);
+  --surface: rgba(14,14,20,0.95);
+  --border:  var(--glass-rim);
+  --text:    var(--macos-text);
+  --muted:   var(--macos-subtext);
+  --dim:     var(--macos-dim);
+  --accent:  var(--macos-blue);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--macos-bg);
+  color: var(--macos-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.notes-app { display: flex; height: 100vh; }
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+.notes-sidebar {
+  width: 220px;
+  background: rgba(14,14,20,0.95);
+  border-right: 1px solid rgba(255,255,255,0.10);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.notes-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 12px 8px;
+  border-bottom: 1px solid var(--glass-rim);
+}
+
+.notes-app-title { font-size: 14px; font-weight: 700; }
+
+.notes-create-btn-sm {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--glass-rim);
+  color: var(--macos-subtext);
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background 0.15s;
+}
+.notes-create-btn-sm:hover { background: rgba(255,255,255,0.14); color: var(--macos-text); }
+
+.notes-search {
+  margin: 8px;
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--glass-rim);
+  border-radius: 8px;
+  color: var(--macos-text);
+  font-size: 12px;
+  outline: none;
+}
+.notes-search:focus { border-color: var(--macos-blue); }
+
+.notes-list { flex: 1; overflow-y: auto; padding: 4px; }
+
+.notes-list-item {
+  padding: 8px 8px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s;
+}
+.notes-list-item:hover { background: rgba(255,255,255,0.05); }
+
+.notes-selected { background: rgba(10,132,255,0.12) !important; }
+
+.notes-list-title {
+  font-size: 12px;
+  font-weight: 600;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notes-list-date { font-size: 10px; color: var(--macos-subtext); display: block; margin-top: 2px; }
+
+.notes-delete-btn {
+  position: absolute;
+  right: 6px;
+  top: 8px;
+  background: none;
+  border: none;
+  color: var(--macos-dim);
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.notes-list-item:hover .notes-delete-btn { opacity: 1; }
+
+.notes-empty-hint { font-size: 11px; color: var(--macos-dim); text-align: center; padding: 16px; }
+
+/* ── Editor area ─────────────────────────────────────────────────────────── */
+.notes-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #0d0d14; }
+
+.notes-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--macos-subtext);
+}
+
+.notes-create-btn {
+  background: rgba(10,132,255,0.15);
+  border: 1px solid rgba(10,132,255,0.30);
+  color: var(--macos-blue);
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.notes-create-btn:hover { background: rgba(10,132,255,0.22); }
+
+.notes-editor-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+.notes-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  background: rgba(18,18,24,0.98);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+
+.notes-tool-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--glass-rim);
+  color: var(--macos-subtext);
+  border-radius: 5px;
+  padding: 3px 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s var(--ease-out-expo);
+}
+.notes-tool-btn:hover { background: rgba(255,255,255,0.12); color: var(--macos-text); }
+.notes-tool-btn.active {
+  background: rgba(10,132,255,0.18);
+  border-color: rgba(10,132,255,0.35);
+  color: var(--macos-blue);
+}
+
+.notes-tool-sep { width: 1px; height: 16px; background: var(--glass-rim); margin: 0 4px; }
+
+.notes-title-input {
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--macos-text);
+  font-size: 20px;
+  font-weight: 700;
+  padding: 14px 18px 8px;
+  outline: none;
+}
+
+/* ── Content ─────────────────────────────────────────────────────────────── */
+.notes-content { flex: 1; overflow-y: auto; padding: 4px 18px 18px; }
+.notes-content .ProseMirror { outline: none; min-height: 200px; line-height: 1.7; font-size: 14px; }
+.notes-content .ProseMirror p { margin-bottom: 8px; }
+.notes-content .ProseMirror h2 { font-size: 17px; font-weight: 700; margin: 16px 0 6px; }
+.notes-content .ProseMirror blockquote {
+  border-left: 3px solid var(--macos-blue);
+  padding-left: 12px;
+  color: var(--macos-subtext);
+  font-style: italic;
+  margin: 10px 0;
+}
+.notes-content .ProseMirror ul { padding-left: 20px; margin-bottom: 8px; }
+.notes-content .ProseMirror li { margin-bottom: 4px; }
+.notes-content .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--macos-dim);
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+/* ── Captures / Clips panel (glass card) ─────────────────────────────────── */
+.notes-clips-panel {
+  border-top: 1px solid var(--glass-rim);
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-top-color: rgba(255,255,255,0.22);
+  border-radius: 14px;
+  margin: 0 10px 10px;
+  flex-shrink: 0;
+  max-height: 160px;
+  overflow-y: auto;
+  box-shadow: inset 0 1px 0 var(--glass-specular);
+}
+
+.notes-clips-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--macos-subtext);
+  margin-bottom: 7px;
+}
+.notes-clips-list { display: flex; flex-direction: column; gap: 4px; }
+
+.notes-clip-item {
+  padding: 5px 8px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--glass-rim);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.notes-clip-item:hover {
+  background: rgba(10,132,255,0.12);
+  border-color: rgba(10,132,255,0.25);
+}
+.notes-clip-text { font-size: 11px; color: var(--macos-text); display: block; }
+.notes-clip-source { font-size: 10px; color: var(--macos-subtext); }

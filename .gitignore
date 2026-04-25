@@ -1,0 +1,11 @@
+node_modules/
+dist/
+release/
+.DS_Store
+*.local
+.env
+
+# Tooling artifacts
+.claude/
+graphify-out/
+*.log
