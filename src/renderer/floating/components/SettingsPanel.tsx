@@ -120,6 +120,19 @@ export function SettingsPanel({ settings, focusSettings, onSave, onClose }: Prop
     setGmailStatus('idle'); setGmailEmail('')
   }
 
+  /** Wipes saved Client ID + Secret + tokens so user can paste fresh ones from a new project. */
+  async function handleResetOAuth() {
+    await ipc.invoke('gmail:resetOAuthCredentials')
+    setFs(prev => ({
+      ...prev,
+      gmailEnabled: false, gmailEmail: undefined,
+      gmailOauthClientId: undefined, gmailOauthClientSecretEncrypted: undefined,
+      gmailOauthRefreshTokenEncrypted: undefined, gmailOauthAccessTokenEncrypted: undefined,
+    }))
+    setOauthClientId(''); setOauthClientSecret('')
+    setGmailStatus('idle'); setGmailError('')
+  }
+
   async function handleSaveLLMKey() {
     if (!llmProvider || !llmKey) return
     await ipc.invoke('focus:settings:setLLMKey', {
@@ -376,6 +389,18 @@ export function SettingsPanel({ settings, focusSettings, onSave, onClose }: Prop
                 </div>
 
                 <Section title="Credentials">
+                  {focusSettings?.gmailOauthClientId && (
+                    <div className="rounded-md bg-white/[0.04] border border-white/[0.08] px-3 py-2 mb-2 flex items-center gap-2">
+                      <span className="text-[10px] uppercase tracking-wider text-white/40">Stored Client ID:</span>
+                      <code className="text-[10px] font-mono text-white/70 truncate flex-1">
+                        {focusSettings.gmailOauthClientId}
+                      </code>
+                      <button onClick={handleResetOAuth}
+                        className="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-red-500/15 text-red-300 hover:bg-red-500/25">
+                        Reset
+                      </button>
+                    </div>
+                  )}
                   <Field label="Client ID" hint="Looks like: 1234567890-abc...apps.googleusercontent.com">
                     <Input value={oauthClientId} onChange={e => setOauthClientId(e.target.value)}
                       placeholder="...apps.googleusercontent.com" />
@@ -394,7 +419,8 @@ export function SettingsPanel({ settings, focusSettings, onSave, onClose }: Prop
                         : <><ExternalLink size={13} /> Sign in with Google</>}
                     </Button>
                     <p className="text-[10px] text-white/35">
-                      Click → opens your browser → sign in to Google → grant Mail access → done. Refresh tokens are saved encrypted in your Keychain.
+                      Click → opens your browser → sign in to Google → grant Mail access → done.
+                      The OAuth consent screen shows the project name from <strong>your</strong> Google Cloud project — if it says "job board" instead of "focus-os", you pasted the wrong Client ID.
                     </p>
                   </div>
                 </Section>

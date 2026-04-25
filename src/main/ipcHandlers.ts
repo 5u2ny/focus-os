@@ -155,6 +155,19 @@ export function setupIPC() {
     return { ok: true };
   });
   ipcMain.handle('gmail:hasShippedOAuth', () => gmailService.hasShippedOAuth());
+  // Wipe stored Client ID + Secret so a fresh paste isn't fighting stale values
+  ipcMain.handle('gmail:resetOAuthCredentials', () => {
+    focusStore.updateSettings({
+      gmailEnabled: false,
+      gmailEmail: undefined,
+      gmailOauthClientId: undefined,
+      gmailOauthClientSecretEncrypted: undefined,
+      gmailOauthRefreshTokenEncrypted: undefined,
+      gmailOauthAccessTokenEncrypted: undefined,
+      gmailOauthAccessTokenExpiresAt: undefined,
+    });
+    return { ok: true };
+  });
   ipcMain.handle('gmail:fetchNow', async () => {
     const items = await gmailService.fetchNow();
     windowManager.sendToFloating('gmail:newEmails', items);
