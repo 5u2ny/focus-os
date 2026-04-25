@@ -31,11 +31,14 @@ export function SettingsPanel({ settings, focusSettings, onSave, onClose }: Prop
   const [newCatDesc, setNewCatDesc]   = useState('')
   const [newCatColor, setNewCatColor] = useState('#6ee08c')
 
-  // Gmail
+  // Gmail — App Password (legacy) AND OAuth2 (new, works for Workspace)
   const [gmailEmail, setGmailEmail]   = useState(focusSettings?.gmailEmail ?? '')
   const [gmailPass, setGmailPass]     = useState('')
   const [gmailStatus, setGmailStatus] = useState<'idle' | 'connecting' | 'ok' | 'error'>('idle')
   const [gmailError, setGmailError]   = useState('')
+  const [gmailMode, setGmailMode]     = useState<'oauth' | 'app-password'>('oauth')
+  const [oauthClientId, setOauthClientId]     = useState(focusSettings?.gmailOauthClientId ?? '')
+  const [oauthClientSecret, setOauthClientSecret] = useState('')
 
   // AI
   const [llmProvider, setLlmProvider] = useState<'anthropic' | 'openai' | ''>(focusSettings?.llmProvider ?? '')
@@ -87,6 +90,31 @@ export function SettingsPanel({ settings, focusSettings, onSave, onClose }: Prop
       setGmailStatus('error')
       setGmailError(err?.message ?? 'Connection failed')
     }
+  }
+
+  /** OAuth2 flow: opens browser → user signs in → loopback callback → tokens saved. */
+  async function handleConnectGmailOAuth() {
+    setGmailStatus('connecting'); setGmailError('')
+    try {
+      const res = await ipc.invoke<{ ok: boolean; error?: string; email?: string }>('gmail:oauthConnect', {
+        clientId: oauthClientId, clientSecret: oauthClientSecret,
+      })
+      setGmailStatus(res.ok ? 'ok' : 'error')
+      if (!res.ok) setGmailError(res.error ?? 'OAuth sign-in failed')
+      else {
+        setFs(prev => ({ ...prev, gmailEmail: res.email, gmailEnabled: true, gmailOauthClientId: oauthClientId }))
+        setOauthClientSecret('')   // never display the secret again once saved
+      }
+    } catch (err: any) {
+      setGmailStatus('error')
+      setGmailError(err?.message ?? 'OAuth sign-in failed')
+    }
+  }
+
+  async function handleDisconnectGmail() {
+    await ipc.invoke('gmail:disconnect')
+    setFs(prev => ({ ...prev, gmailEnabled: false, gmailEmail: undefined }))
+    setGmailStatus('idle'); setGmailEmail('')
   }
 
   async function handleSaveLLMKey() {
@@ -224,61 +252,37 @@ export function SettingsPanel({ settings, focusSettings, onSave, onClose }: Prop
 
           {/* GMAIL */}
           <TabsContent value="gmail" className="space-y-4 m-0">
-            {keychainOk === false && (
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 flex items-start gap-3">
-                <AlertCircle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-amber-200">macOS Keychain unavailable</p>
-                  <p className="text-xs text-amber-200/70 mt-1">
-                    Without Keychain, your app password would be stored as plain base64 — not secure. Sign in to your Mac, then reopen the app to enable encrypted storage.
-                  </p>
-                </div>
-              </div>
-            )}
+            {/* Connected banner — show + offer to disconnect */}
             {focusSettings?.gmailEnabled && (
               <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 flex items-center gap-2 text-sm text-emerald-200">
                 <Check size={14} /> Connected as <strong>{focusSettings.gmailEmail}</strong>
+                <button onClick={handleDisconnectGmail}
+                  className="ml-auto text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-white/[0.08] text-white/70 hover:bg-white/[0.16] hover:text-white">
+                  Disconnect
+                </button>
               </div>
             )}
 
-            {/* Step-by-step setup so users don't paste their regular password */}
-            <div className="rounded-lg bg-white/[0.03] border border-white/[0.08] p-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-white/45 mb-3">
-                Setup (one time, ~60 seconds)
-              </p>
-              <ol className="space-y-2.5 text-xs text-white/75">
-                <li className="flex gap-2">
-                  <span className="phase-text font-bold flex-shrink-0">1.</span>
-                  <span>Turn ON 2-step verification at{' '}
-                    <a className="text-sky-400 hover:underline" target="_blank" rel="noreferrer"
-                      href="https://myaccount.google.com/signinoptions/two-step-verification">
-                      myaccount.google.com/signinoptions/two-step-verification
-                    </a>
-                    {' '}(required — App Passwords don't exist without it).
-                  </span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="phase-text font-bold flex-shrink-0">2.</span>
-                  <span>Generate an App Password at{' '}
-                    <a className="text-sky-400 hover:underline" target="_blank" rel="noreferrer"
-                      href="https://myaccount.google.com/apppasswords">
-                      myaccount.google.com/apppasswords
-                    </a>
-                    {' '}— 16 characters like <code className="px-1 py-0.5 rounded bg-white/[0.06] font-mono text-[10px]">abcd efgh ijkl mnop</code>.
-                    <strong className="text-amber-200"> Do NOT use your regular Gmail password — it will fail.</strong>
-                  </span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="phase-text font-bold flex-shrink-0">3.</span>
-                  <span>Enable IMAP at{' '}
-                    <a className="text-sky-400 hover:underline" target="_blank" rel="noreferrer"
-                      href="https://mail.google.com/mail/u/0/#settings/fwdandpop">
-                      Gmail → Settings → Forwarding and POP/IMAP
-                    </a>
-                    {' '}(scroll down, click "Enable IMAP", Save).
-                  </span>
-                </li>
-              </ol>
+            {/* Mode toggle: OAuth (recommended) vs App Password (legacy) */}
+            <div className="flex gap-1 p-1 rounded-lg bg-white/[0.04] border border-white/[0.06]">
+              <button onClick={() => setGmailMode('oauth')}
+                className={cn(
+                  'flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition',
+                  gmailMode === 'oauth'
+                    ? 'bg-white/[0.10] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]'
+                    : 'text-white/45 hover:text-white/85'
+                )}>
+                Sign in with Google (recommended)
+              </button>
+              <button onClick={() => setGmailMode('app-password')}
+                className={cn(
+                  'flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition',
+                  gmailMode === 'app-password'
+                    ? 'bg-white/[0.10] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]'
+                    : 'text-white/45 hover:text-white/85'
+                )}>
+                App Password (legacy)
+              </button>
             </div>
 
             {keychainOk === false && (
@@ -287,51 +291,155 @@ export function SettingsPanel({ settings, focusSettings, onSave, onClose }: Prop
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-amber-200">macOS Keychain unavailable</p>
                   <p className="text-xs text-amber-200/70 mt-1">
-                    Without Keychain, your app password would be stored as plain base64 — not secure. Sign in to your Mac, then reopen the app to enable encrypted storage.
+                    Without Keychain, your credentials would be stored as plain base64 — not secure. Sign in to your Mac, then reopen the app to enable encrypted storage.
                   </p>
                 </div>
               </div>
             )}
 
-            <Section title="Connection">
-              <Field label="Gmail address">
-                <Input type="email" value={gmailEmail} onChange={e => setGmailEmail(e.target.value)}
-                  placeholder="you@gmail.com" />
-              </Field>
-              <Field label="App password (16 chars from step 2 above)"
-                hint="Spaces are fine — they'll be stripped automatically.">
-                <Input type="password" value={gmailPass} onChange={e => setGmailPass(e.target.value)}
-                  placeholder="abcd efgh ijkl mnop" />
-              </Field>
+            {/* ── OAuth mode (works for Workspace + personal accounts) ── */}
+            {gmailMode === 'oauth' && (
+              <>
+                <div className="rounded-lg bg-white/[0.03] border border-white/[0.08] p-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-white/45 mb-3">
+                    One-time setup (~3 minutes)
+                  </p>
+                  <ol className="space-y-2.5 text-xs text-white/75">
+                    <li className="flex gap-2">
+                      <span className="phase-text font-bold flex-shrink-0">1.</span>
+                      <span>Open{' '}
+                        <a className="text-sky-400 hover:underline" target="_blank" rel="noreferrer"
+                          href="https://console.cloud.google.com/projectcreate">
+                          Google Cloud Console
+                        </a>
+                        {' '}→ create a new project (any name, e.g. "Focus OS").
+                      </span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="phase-text font-bold flex-shrink-0">2.</span>
+                      <span>Enable the Gmail API at{' '}
+                        <a className="text-sky-400 hover:underline" target="_blank" rel="noreferrer"
+                          href="https://console.cloud.google.com/apis/library/gmail.googleapis.com">
+                          console.cloud.google.com/apis/library/gmail.googleapis.com
+                        </a>{' '}→ Enable.
+                      </span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="phase-text font-bold flex-shrink-0">3.</span>
+                      <span>Configure OAuth consent screen at{' '}
+                        <a className="text-sky-400 hover:underline" target="_blank" rel="noreferrer"
+                          href="https://console.cloud.google.com/apis/credentials/consent">
+                          OAuth consent screen
+                        </a>{' '}→ User Type: <strong>External</strong> → fill app name + your email →
+                        add scope <code className="px-1 py-0.5 rounded bg-white/[0.06] font-mono text-[10px]">https://mail.google.com/</code> →
+                        add yourself as a Test User.
+                      </span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="phase-text font-bold flex-shrink-0">4.</span>
+                      <span>Create credentials at{' '}
+                        <a className="text-sky-400 hover:underline" target="_blank" rel="noreferrer"
+                          href="https://console.cloud.google.com/apis/credentials">
+                          Credentials
+                        </a>{' '}→ Create Credentials → OAuth client ID → Application type: <strong>Desktop app</strong> → name it → Create.
+                        Copy the Client ID + Client Secret it shows you.
+                      </span>
+                    </li>
+                  </ol>
+                </div>
 
-              {/* Live char count so the user can SEE if they entered the wrong password */}
-              {gmailPass && (
-                <p className={cn(
-                  'text-[11px] -mt-1',
-                  gmailPass.replace(/\s+/g, '').length === 16 ? 'text-emerald-400' : 'text-amber-300'
-                )}>
-                  {gmailPass.replace(/\s+/g, '').length === 16
-                    ? '✓ Looks like an App Password (16 chars)'
-                    : `⚠ App Passwords are exactly 16 chars. You entered ${gmailPass.replace(/\s+/g, '').length}. (Your regular Gmail password is longer/shorter and will be rejected.)`
-                  }
-                </p>
-              )}
-
-              <div className="flex flex-col gap-2 mt-2">
-                <Button variant="phase" onClick={handleConnectGmail}
-                  disabled={gmailStatus === 'connecting' || !gmailEmail || !gmailPass || keychainOk === false}>
-                  {gmailStatus === 'connecting' ? 'Connecting to imap.gmail.com…'
-                    : gmailStatus === 'ok' ? <><Check size={13} /> Connected</>
-                    : 'Connect Gmail'}
-                </Button>
-                {gmailError && (
-                  <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-200 flex items-start gap-2">
-                    <AlertCircle size={14} className="text-red-400 flex-shrink-0 mt-0.5" />
-                    <span>{gmailError}</span>
+                <Section title="Credentials">
+                  <Field label="Client ID" hint="Looks like: 1234567890-abc...apps.googleusercontent.com">
+                    <Input value={oauthClientId} onChange={e => setOauthClientId(e.target.value)}
+                      placeholder="...apps.googleusercontent.com" />
+                  </Field>
+                  <Field label="Client Secret" hint="Stored encrypted in macOS Keychain.">
+                    <Input type="password" value={oauthClientSecret}
+                      onChange={e => setOauthClientSecret(e.target.value)}
+                      placeholder={focusSettings?.gmailOauthClientSecretEncrypted ? '(saved — enter new to update)' : 'GOCSPX-...'} />
+                  </Field>
+                  <div className="flex flex-col gap-2 mt-2">
+                    <Button variant="phase" onClick={handleConnectGmailOAuth}
+                      disabled={gmailStatus === 'connecting' || !oauthClientId || !oauthClientSecret || keychainOk === false}>
+                      {gmailStatus === 'connecting'
+                        ? 'Waiting for Google sign-in in browser…'
+                        : gmailStatus === 'ok' ? <><Check size={13} /> Connected</>
+                        : <><ExternalLink size={13} /> Sign in with Google</>}
+                    </Button>
+                    <p className="text-[10px] text-white/35">
+                      Click → opens your browser → sign in to Google → grant Mail access → done. Refresh tokens are saved encrypted in your Keychain.
+                    </p>
                   </div>
-                )}
+                </Section>
+              </>
+            )}
+
+            {/* ── App Password mode (legacy — won't work for Workspace) ── */}
+            {gmailMode === 'app-password' && (
+              <>
+                <div className="rounded-lg bg-white/[0.03] border border-white/[0.08] p-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-white/45 mb-3">
+                    Setup
+                  </p>
+                  <ol className="space-y-2.5 text-xs text-white/75">
+                    <li className="flex gap-2">
+                      <span className="phase-text font-bold flex-shrink-0">1.</span>
+                      <span>Turn ON 2-step verification at{' '}
+                        <a className="text-sky-400 hover:underline" target="_blank" rel="noreferrer"
+                          href="https://myaccount.google.com/signinoptions/two-step-verification">
+                          myaccount.google.com/.../two-step-verification
+                        </a>.
+                      </span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="phase-text font-bold flex-shrink-0">2.</span>
+                      <span>Generate App Password at{' '}
+                        <a className="text-sky-400 hover:underline" target="_blank" rel="noreferrer"
+                          href="https://myaccount.google.com/apppasswords">
+                          myaccount.google.com/apppasswords
+                        </a>{' '}— 16 chars like <code className="px-1 py-0.5 rounded bg-white/[0.06] font-mono text-[10px]">abcd efgh ijkl mnop</code>.
+                        <strong className="text-amber-200"> Workspace admins often disable this — use OAuth instead.</strong>
+                      </span>
+                    </li>
+                  </ol>
+                </div>
+
+                <Section title="Connection">
+                  <Field label="Gmail address">
+                    <Input type="email" value={gmailEmail} onChange={e => setGmailEmail(e.target.value)}
+                      placeholder="you@gmail.com" />
+                  </Field>
+                  <Field label="App password (16 chars)" hint="Spaces are stripped automatically.">
+                    <Input type="password" value={gmailPass} onChange={e => setGmailPass(e.target.value)}
+                      placeholder="abcd efgh ijkl mnop" />
+                  </Field>
+                  {gmailPass && (
+                    <p className={cn(
+                      'text-[11px] -mt-1',
+                      gmailPass.replace(/\s+/g, '').length === 16 ? 'text-emerald-400' : 'text-amber-300'
+                    )}>
+                      {gmailPass.replace(/\s+/g, '').length === 16
+                        ? '✓ Looks like an App Password (16 chars)'
+                        : `⚠ App Passwords are exactly 16 chars. You entered ${gmailPass.replace(/\s+/g, '').length}.`}
+                    </p>
+                  )}
+                  <Button variant="phase" onClick={handleConnectGmail}
+                    disabled={gmailStatus === 'connecting' || !gmailEmail || !gmailPass || keychainOk === false}>
+                    {gmailStatus === 'connecting' ? 'Connecting to imap.gmail.com…'
+                      : gmailStatus === 'ok' ? <><Check size={13} /> Connected</>
+                      : 'Connect Gmail'}
+                  </Button>
+                </Section>
+              </>
+            )}
+
+            {/* Shared error block for both modes */}
+            {gmailError && (
+              <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-200 flex items-start gap-2">
+                <AlertCircle size={14} className="text-red-400 flex-shrink-0 mt-0.5" />
+                <span>{gmailError}</span>
               </div>
-            </Section>
+            )}
 
             <Section title="Fetch Schedule">
               <NumberField label="Fetch interval" min={5} max={60} suffix="min"

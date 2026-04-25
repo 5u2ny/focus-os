@@ -75,7 +75,13 @@ export interface Settings {
   llmModel?: string;
   gmailEnabled: boolean;
   gmailEmail?: string;
-  gmailAppPasswordEncrypted?: string;
+  gmailAppPasswordEncrypted?: string;     // legacy: App Password path
+  // OAuth2 path — works for Workspace accounts where App Passwords are blocked
+  gmailOauthClientId?: string;
+  gmailOauthClientSecretEncrypted?: string;
+  gmailOauthRefreshTokenEncrypted?: string;
+  gmailOauthAccessTokenEncrypted?: string;
+  gmailOauthAccessTokenExpiresAt?: number; // ms epoch
   gmailFetchIntervalMin: number;
   gmailMaxResultsPerFetch: number;
   pillPosition: { x: number; y: number };

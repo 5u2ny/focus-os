@@ -12,20 +12,46 @@ export interface FetchedEmail {
 
 const TIMEOUT_MS = 30_000;
 
+/**
+ * Build the XOAUTH2 SASL string per RFC 5050:
+ *   "user=<email>\x01auth=Bearer <accessToken>\x01\x01"
+ * then base64-encoded. The `imap` library accepts this directly via the
+ * `xoauth2` constructor option.
+ */
+function buildXOAuth2(email: string, accessToken: string): string {
+  const raw = `user=${email}\x01auth=Bearer ${accessToken}\x01\x01`;
+  return Buffer.from(raw).toString('base64');
+}
+
+/**
+ * Connect to Gmail IMAP and fetch the latest N messages. Auth method is
+ * decided by the auth arg: pass `{ password }` for App Password (legacy)
+ * or `{ accessToken }` for OAuth2 (XOAUTH2).
+ */
 export async function fetchRecent(
   email: string,
-  appPassword: string,
+  auth: string | { password?: string; accessToken?: string },
   maxResults = 20,
 ): Promise<FetchedEmail[]> {
   const fetchPromise = new Promise<FetchedEmail[]>((resolve, reject) => {
-    const imap = new Imap({
+    // Backward-compat: if `auth` is a string, treat it as App Password
+    const a = typeof auth === 'string' ? { password: auth } : auth;
+    const imapOpts: any = {
       user: email,
-      password: appPassword.replace(/\s+/g, ''), // strip spaces from App Passwords
       host: 'imap.gmail.com',
       port: 993,
       tls: true,
       tlsOptions: { rejectUnauthorized: false },
-    });
+    };
+    if (a.accessToken) {
+      imapOpts.xoauth2 = buildXOAuth2(email, a.accessToken);
+    } else if (a.password) {
+      imapOpts.password = a.password.replace(/\s+/g, '');
+    } else {
+      reject(new Error('IMAP auth requires either a password (App Password) or accessToken (OAuth2)'));
+      return;
+    }
+    const imap = new Imap(imapOpts);
 
     const results: FetchedEmail[] = [];
     const parsePromises: Promise<void>[] = [];

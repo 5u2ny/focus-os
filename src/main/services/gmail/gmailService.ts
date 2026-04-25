@@ -2,6 +2,7 @@ import { focusStore } from '../store';
 import { secureStore } from '../keychain/secureStore';
 import { fetchRecent } from './imapClient';
 import { triageEmail } from './emailTriage';
+import { startOAuthFlow, getValidAccessToken, disconnectOAuth } from './oauth';
 import { v4 as uuid } from 'uuid';
 import type { EmailDigestItem } from '../../../shared/schema/index';
 
@@ -51,6 +52,7 @@ export const gmailService = {
   },
 
   disconnect(): void {
+    disconnectOAuth();
     focusStore.updateSettings({
       gmailEnabled: false,
       gmailEmail:   undefined,
@@ -59,15 +61,29 @@ export const gmailService = {
     this.stopPolling();
   },
 
+  /** OAuth2 entry point — opens browser, runs loopback flow, persists tokens. */
+  async oauthConnect(clientId: string, clientSecret: string) {
+    return startOAuthFlow(clientId.trim(), clientSecret.trim());
+  },
+
   async fetchNow(): Promise<EmailDigestItem[]> {
     const settings = focusStore.getSettings();
-    if (!settings.gmailEnabled || !settings.gmailEmail || !settings.gmailAppPasswordEncrypted) {
+    if (!settings.gmailEnabled || !settings.gmailEmail) return [];
+
+    // Prefer OAuth (works for Workspace), fall back to App Password
+    let auth: string | { accessToken: string };
+    if (settings.gmailOauthRefreshTokenEncrypted) {
+      const { accessToken } = await getValidAccessToken();
+      auth = { accessToken };
+    } else if (settings.gmailAppPasswordEncrypted) {
+      auth = secureStore.decrypt(settings.gmailAppPasswordEncrypted);
+    } else {
       return [];
     }
-    const password = secureStore.decrypt(settings.gmailAppPasswordEncrypted);
+
     const fetched  = await fetchRecent(
       settings.gmailEmail,
-      password,
+      auth,
       settings.gmailMaxResultsPerFetch,
     );
 

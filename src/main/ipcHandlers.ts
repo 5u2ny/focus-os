@@ -142,6 +142,18 @@ export function setupIPC() {
     }
     return result;
   });
+  // OAuth2 path — works for Workspace accounts where App Passwords are blocked
+  ipcMain.handle('gmail:oauthConnect', async (_e, r: { clientId: string; clientSecret: string }) => {
+    const result = await gmailService.oauthConnect(r.clientId, r.clientSecret);
+    if (result.ok) {
+      gmailService.startPolling((items) => windowManager.sendToFloating('gmail:newEmails', items));
+    }
+    return result;
+  });
+  ipcMain.handle('gmail:disconnect', () => {
+    gmailService.disconnect();
+    return { ok: true };
+  });
   ipcMain.handle('gmail:fetchNow', async () => {
     const items = await gmailService.fetchNow();
     windowManager.sendToFloating('gmail:newEmails', items);
