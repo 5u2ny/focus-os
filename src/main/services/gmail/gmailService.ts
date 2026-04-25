@@ -10,10 +10,17 @@ let pollingInterval: ReturnType<typeof setInterval> | null = null;
 export const gmailService = {
   async connect(email: string, appPassword: string): Promise<{ ok: boolean; error?: string }> {
     console.log(`[gmailService] Connecting ${email}...`);
+    // Quick client-side sanity checks before hitting the network
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return { ok: false, error: `That doesn't look like a valid email address.` };
+    }
+    const cleanPwd = appPassword.replace(/\s+/g, '');
+    if (cleanPwd.length !== 16) {
+      return { ok: false, error: `App Passwords are exactly 16 characters (you entered ${cleanPwd.length}). Generate one at https://myaccount.google.com/apppasswords — your regular Gmail password will NOT work.` };
+    }
+
     try {
-      // Test connection by fetching 1 email
       await fetchRecent(email, appPassword, 1);
-      // Save credentials encrypted
       const encPassword = secureStore.encrypt(appPassword);
       focusStore.updateSettings({
         gmailEnabled: true,
@@ -23,9 +30,23 @@ export const gmailService = {
       console.log(`[gmailService] Connected as ${email}`);
       return { ok: true };
     } catch (err) {
-      const msg = (err as Error).message;
-      console.error(`[gmailService] Connect failed for ${email}:`, msg);
-      return { ok: false, error: msg };
+      const raw = (err as Error).message || String(err);
+      console.error(`[gmailService] Connect failed for ${email}:`, raw);
+      // Translate cryptic IMAP errors into actionable guidance
+      const lower = raw.toLowerCase();
+      let friendly = raw;
+      if (lower.includes('invalid credentials') || lower.includes('authentication') || lower.includes('lookup failed')) {
+        friendly =
+          'Gmail rejected the password. Three things to check: ' +
+          '(1) 2-factor auth must be ON for your Google account; ' +
+          '(2) generate a fresh App Password at myaccount.google.com/apppasswords (not your regular Gmail password); ' +
+          '(3) IMAP must be enabled in Gmail → Settings → Forwarding and POP/IMAP.';
+      } else if (lower.includes('timeout')) {
+        friendly = 'Connection to imap.gmail.com timed out. Check your network or firewall.';
+      } else if (lower.includes('enotfound') || lower.includes('econnrefused')) {
+        friendly = `Couldn't reach imap.gmail.com. Check your internet connection.`;
+      }
+      return { ok: false, error: friendly };
     }
   },
 

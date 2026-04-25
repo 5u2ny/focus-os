@@ -235,16 +235,61 @@ export function SettingsPanel({ settings, focusSettings, onSave, onClose }: Prop
                 </div>
               </div>
             )}
-            <p className="text-xs text-white/50 leading-relaxed">
-              Use a Gmail{' '}
-              <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer"
-                className="text-sky-400 hover:underline">App Password</a>
-              {' '}— not your main password. Two-factor auth must be enabled.
-            </p>
-
             {focusSettings?.gmailEnabled && (
               <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 flex items-center gap-2 text-sm text-emerald-200">
                 <Check size={14} /> Connected as <strong>{focusSettings.gmailEmail}</strong>
+              </div>
+            )}
+
+            {/* Step-by-step setup so users don't paste their regular password */}
+            <div className="rounded-lg bg-white/[0.03] border border-white/[0.08] p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-white/45 mb-3">
+                Setup (one time, ~60 seconds)
+              </p>
+              <ol className="space-y-2.5 text-xs text-white/75">
+                <li className="flex gap-2">
+                  <span className="phase-text font-bold flex-shrink-0">1.</span>
+                  <span>Turn ON 2-step verification at{' '}
+                    <a className="text-sky-400 hover:underline" target="_blank" rel="noreferrer"
+                      href="https://myaccount.google.com/signinoptions/two-step-verification">
+                      myaccount.google.com/signinoptions/two-step-verification
+                    </a>
+                    {' '}(required — App Passwords don't exist without it).
+                  </span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="phase-text font-bold flex-shrink-0">2.</span>
+                  <span>Generate an App Password at{' '}
+                    <a className="text-sky-400 hover:underline" target="_blank" rel="noreferrer"
+                      href="https://myaccount.google.com/apppasswords">
+                      myaccount.google.com/apppasswords
+                    </a>
+                    {' '}— 16 characters like <code className="px-1 py-0.5 rounded bg-white/[0.06] font-mono text-[10px]">abcd efgh ijkl mnop</code>.
+                    <strong className="text-amber-200"> Do NOT use your regular Gmail password — it will fail.</strong>
+                  </span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="phase-text font-bold flex-shrink-0">3.</span>
+                  <span>Enable IMAP at{' '}
+                    <a className="text-sky-400 hover:underline" target="_blank" rel="noreferrer"
+                      href="https://mail.google.com/mail/u/0/#settings/fwdandpop">
+                      Gmail → Settings → Forwarding and POP/IMAP
+                    </a>
+                    {' '}(scroll down, click "Enable IMAP", Save).
+                  </span>
+                </li>
+              </ol>
+            </div>
+
+            {keychainOk === false && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 flex items-start gap-3">
+                <AlertCircle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-amber-200">macOS Keychain unavailable</p>
+                  <p className="text-xs text-amber-200/70 mt-1">
+                    Without Keychain, your app password would be stored as plain base64 — not secure. Sign in to your Mac, then reopen the app to enable encrypted storage.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -253,19 +298,37 @@ export function SettingsPanel({ settings, focusSettings, onSave, onClose }: Prop
                 <Input type="email" value={gmailEmail} onChange={e => setGmailEmail(e.target.value)}
                   placeholder="you@gmail.com" />
               </Field>
-              <Field label="App password" hint="16-character password from Google → Security → App passwords">
+              <Field label="App password (16 chars from step 2 above)"
+                hint="Spaces are fine — they'll be stripped automatically.">
                 <Input type="password" value={gmailPass} onChange={e => setGmailPass(e.target.value)}
-                  placeholder="xxxx xxxx xxxx xxxx" />
+                  placeholder="abcd efgh ijkl mnop" />
               </Field>
-              <div className="flex items-center gap-2">
+
+              {/* Live char count so the user can SEE if they entered the wrong password */}
+              {gmailPass && (
+                <p className={cn(
+                  'text-[11px] -mt-1',
+                  gmailPass.replace(/\s+/g, '').length === 16 ? 'text-emerald-400' : 'text-amber-300'
+                )}>
+                  {gmailPass.replace(/\s+/g, '').length === 16
+                    ? '✓ Looks like an App Password (16 chars)'
+                    : `⚠ App Passwords are exactly 16 chars. You entered ${gmailPass.replace(/\s+/g, '').length}. (Your regular Gmail password is longer/shorter and will be rejected.)`
+                  }
+                </p>
+              )}
+
+              <div className="flex flex-col gap-2 mt-2">
                 <Button variant="phase" onClick={handleConnectGmail}
                   disabled={gmailStatus === 'connecting' || !gmailEmail || !gmailPass || keychainOk === false}>
-                  {gmailStatus === 'connecting' ? 'Connecting…'
+                  {gmailStatus === 'connecting' ? 'Connecting to imap.gmail.com…'
                     : gmailStatus === 'ok' ? <><Check size={13} /> Connected</>
                     : 'Connect Gmail'}
                 </Button>
                 {gmailError && (
-                  <span className="text-xs text-red-400 flex items-center gap-1"><AlertCircle size={12} /> {gmailError}</span>
+                  <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-200 flex items-start gap-2">
+                    <AlertCircle size={14} className="text-red-400 flex-shrink-0 mt-0.5" />
+                    <span>{gmailError}</span>
+                  </div>
                 )}
               </div>
             </Section>
