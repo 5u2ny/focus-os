@@ -3,6 +3,7 @@ import { secureStore } from '../keychain/secureStore';
 import { fetchRecent } from './imapClient';
 import { triageEmail } from './emailTriage';
 import { startOAuthFlow, getValidAccessToken, disconnectOAuth } from './oauth';
+import { SHIPPED_OAUTH, hasShippedOAuth } from './oauthConfig';
 import { v4 as uuid } from 'uuid';
 import type { EmailDigestItem } from '../../../shared/schema/index';
 
@@ -61,9 +62,24 @@ export const gmailService = {
     this.stopPolling();
   },
 
-  /** OAuth2 entry point — opens browser, runs loopback flow, persists tokens. */
-  async oauthConnect(clientId: string, clientSecret: string) {
-    return startOAuthFlow(clientId.trim(), clientSecret.trim());
+  /**
+   * OAuth2 entry point. Prefers credentials shipped with the app (so the
+   * end user gets a true one-click experience). Falls back to user-supplied
+   * values if no shipped credentials are baked in yet.
+   */
+  async oauthConnect(userClientId?: string, userClientSecret?: string) {
+    const id     = hasShippedOAuth() ? SHIPPED_OAUTH.clientId     : (userClientId     ?? '').trim();
+    const secret = hasShippedOAuth() ? SHIPPED_OAUTH.clientSecret : (userClientSecret ?? '').trim();
+    if (!id || !secret) {
+      return { ok: false as const,
+        error: 'No OAuth credentials available. Either bake them into oauthConfig.ts (one-click for everyone) or paste them in Settings → Gmail.' };
+    }
+    return startOAuthFlow(id, secret);
+  },
+
+  /** True when the app has its own OAuth credentials embedded — UI hides the Client ID/Secret fields when so. */
+  hasShippedOAuth(): boolean {
+    return hasShippedOAuth();
   },
 
   async fetchNow(): Promise<EmailDigestItem[]> {

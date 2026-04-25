@@ -50,11 +50,14 @@ export function SettingsPanel({ settings, focusSettings, onSave, onClose }: Prop
   const [axGranted, setAxGranted] = useState<boolean | null>(null)
   // Native macOS Keychain availability (false ⇒ stored as base64 — warn user)
   const [keychainOk, setKeychainOk] = useState<boolean | null>(null)
+  // True when the app ships with bundled OAuth credentials → user gets pure one-click sign-in
+  const [hasShippedOAuth, setHasShippedOAuth] = useState<boolean>(false)
 
   useEffect(() => {
     ipc.invoke<UserCategory[]>('category:list').then(setCategories).catch(() => {})
     ipc.invoke<boolean>('permission:checkAccessibility').then(setAxGranted).catch(() => {})
     ipc.invoke<boolean>('system:safeStorageAvailable').then(setKeychainOk).catch(() => {})
+    ipc.invoke<boolean>('gmail:hasShippedOAuth').then(setHasShippedOAuth).catch(() => {})
   }, [])
 
   async function handleSave() {
@@ -298,8 +301,32 @@ export function SettingsPanel({ settings, focusSettings, onSave, onClose }: Prop
             )}
 
             {/* ── OAuth mode (works for Workspace + personal accounts) ── */}
-            {gmailMode === 'oauth' && (
+            {gmailMode === 'oauth' && hasShippedOAuth && (
+              // App ships with bundled OAuth credentials → pure one-click flow.
+              // No Client ID/Secret fields; just a big Sign In button.
+              <Section title="Sign in">
+                <p className="text-xs text-white/55 mb-3">
+                  Click below — your browser will open, you'll sign in to Google, grant Mail access, and you're done. Tokens are stored encrypted in your macOS Keychain.
+                </p>
+                <Button variant="phase" size="lg" onClick={() => handleConnectGmailOAuth()}
+                  disabled={gmailStatus === 'connecting' || keychainOk === false}>
+                  {gmailStatus === 'connecting'
+                    ? 'Waiting for Google sign-in in browser…'
+                    : gmailStatus === 'ok' ? <><Check size={14} /> Connected</>
+                    : <><ExternalLink size={14} /> Sign in with Google</>}
+                </Button>
+              </Section>
+            )}
+
+            {gmailMode === 'oauth' && !hasShippedOAuth && (
+              // No bundled credentials — user provides their own from Google Cloud Console
               <>
+                <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-3 text-xs text-amber-200">
+                  ⚠ Pure "Sign in with Google" requires the developer to register OAuth credentials once and ship them with the app
+                  (see <code className="px-1 py-0.5 rounded bg-white/[0.06] font-mono text-[10px]">src/main/services/gmail/oauthConfig.ts</code>).
+                  Until that's done, paste your own credentials below — works exactly the same, you just register the OAuth client yourself.
+                </div>
+
                 <div className="rounded-lg bg-white/[0.03] border border-white/[0.08] p-4">
                   <p className="text-xs font-bold uppercase tracking-wider text-white/45 mb-3">
                     One-time setup (~3 minutes)

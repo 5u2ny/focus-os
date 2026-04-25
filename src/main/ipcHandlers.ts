@@ -154,6 +154,7 @@ export function setupIPC() {
     gmailService.disconnect();
     return { ok: true };
   });
+  ipcMain.handle('gmail:hasShippedOAuth', () => gmailService.hasShippedOAuth());
   ipcMain.handle('gmail:fetchNow', async () => {
     const items = await gmailService.fetchNow();
     windowManager.sendToFloating('gmail:newEmails', items);
