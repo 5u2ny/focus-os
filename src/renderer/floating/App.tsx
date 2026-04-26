@@ -3,7 +3,7 @@ import { useAppState } from '@shared/hooks/useAppState'
 import { PHASE_LABELS, PHASE_COLORS } from '@shared/constants'
 import type { TimerPhase } from '@shared/types'
 import { ipc } from '@shared/ipc-client'
-import type { Capture, Todo, Settings, CalendarEvent } from '@schema'
+import type { Capture, Todo, Settings, CalendarEvent, EmailDigestItem } from '@schema'
 import { OnboardingScreen } from './components/OnboardingScreen'
 import { SettingsPanel } from './components/SettingsPanel'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@shared/ui/tabs'
@@ -13,7 +13,8 @@ import { cn } from '@shared/lib/utils'
 import {
   Play, Pause, RotateCcw, ChevronUp, Settings as SettingsIcon,
   Target, Bookmark, ListTodo, Inbox, Trash2, Plus, FileText, Check, Minus,
-  AlertCircle, ExternalLink, Calendar as CalendarIcon, Clock,
+  AlertCircle, ExternalLink, Calendar as CalendarIcon, Clock, Mail, Archive,
+  RefreshCw, Sparkles,
 } from 'lucide-react'
 
 const PHASE_RGB: Record<TimerPhase, [number, number, number]> = {
@@ -61,6 +62,10 @@ export default function App() {
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [newEventTitle, setNewEventTitle] = useState('')
   const [newEventTime, setNewEventTime] = useState('') // HH:MM today
+  const [emails, setEmails] = useState<EmailDigestItem[]>([])
+  const [emailsRefreshing, setEmailsRefreshing] = useState(false)
+  const [generatingReplyFor, setGeneratingReplyFor] = useState<string | null>(null)
+  const [draftReplies, setDraftReplies] = useState<Record<string, string>>({})
   const [captureFlash, setCaptureFlash] = useState(false)
   const [axGranted, setAxGranted] = useState<boolean | null>(null)
   const hasAutoCollapsed = useRef(false)
@@ -100,6 +105,17 @@ export default function App() {
     const endOfDay   = new Date(); endOfDay.setHours(23, 59, 59, 999)
     ipc.invoke<CalendarEvent[]>('calendar:list', { from: startOfDay.getTime(), to: endOfDay.getTime() })
       .then(setEvents).catch(() => {})
+    // Email digest — populated on connect/boot via gmail:newEmails IPC, but also
+    // load whatever's already in the store for instant render.
+    ipc.invoke<EmailDigestItem[]>('gmail:list').then(setEmails).catch(() => {})
+  }, [])
+
+  // Live updates when the main process pushes a fresh fetch
+  useEffect(() => {
+    ipc.on('gmail:newEmails', (items: EmailDigestItem[]) => {
+      setEmails(items.filter(e => !e.archived))
+    })
+    return () => { ipc.off('gmail:newEmails') }
   }, [])
 
   // ── IPC listeners ───────────────────────────────────────────────────────
@@ -242,6 +258,37 @@ export default function App() {
   const deleteEvent = useCallback(async (id: string) => {
     await ipc.invoke('calendar:delete', { id })
     setEvents(prev => prev.filter(e => e.id !== id))
+  }, [])
+
+  // ── Inbox handlers ───────────────────────────────────────────────────────
+  const refreshEmails = useCallback(async () => {
+    setEmailsRefreshing(true)
+    try {
+      const items = await ipc.invoke<EmailDigestItem[]>('gmail:fetchNow')
+      setEmails(items.filter(e => !e.archived))
+    } catch (err) {
+      console.error('Failed to refresh emails:', err)
+    } finally {
+      setEmailsRefreshing(false)
+    }
+  }, [])
+
+  const archiveEmail = useCallback(async (id: string) => {
+    await ipc.invoke('gmail:archive', { id })
+    setEmails(prev => prev.filter(e => e.id !== id))
+  }, [])
+
+  const generateReply = useCallback(async (id: string) => {
+    setGeneratingReplyFor(id)
+    try {
+      const draft = await ipc.invoke<string>('gmail:generateReply', { id })
+      setDraftReplies(prev => ({ ...prev, [id]: draft }))
+    } catch (err) {
+      console.error('Failed to generate reply:', err)
+      setDraftReplies(prev => ({ ...prev, [id]: '⚠ Failed to generate. Make sure an LLM provider is configured in Settings → AI.' }))
+    } finally {
+      setGeneratingReplyFor(null)
+    }
   }, [])
 
   const openSettings = useCallback(() => {
@@ -429,7 +476,12 @@ export default function App() {
           <CalendarIcon size={13} /><span className="hidden xl:inline">Calendar</span>
           {events.length > 0 && <span className="ml-1 text-[9px] phase-text font-bold">{events.length}</span>}
         </TabsTrigger>
-        <TabsTrigger value="inbox" title="Inbox"><Inbox size={13} /><span className="hidden xl:inline">Inbox</span></TabsTrigger>
+        <TabsTrigger value="inbox" title="Inbox">
+          <Inbox size={13} /><span className="hidden xl:inline">Inbox</span>
+          {emails.filter(e => !e.read).length > 0 && (
+            <span className="ml-1 text-[9px] phase-text font-bold">{emails.filter(e => !e.read).length}</span>
+          )}
+        </TabsTrigger>
       </TabsList>
 
       {/* Action buttons — clearly grouped and labeled */}
@@ -679,9 +731,39 @@ export default function App() {
           <div className="flex items-center gap-2 text-sm text-white/60 bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
             🔒 Email is hidden during focus sessions. Check it on your break.
           </div>
+        ) : !focusSettings?.gmailEnabled ? (
+          <EmptyState icon={<Mail size={28} />} title="Connect Gmail"
+            body="Open Settings → Gmail to sign in. Recent unread emails will appear here." />
         ) : (
-          <EmptyState icon={<Inbox size={28} />} title="Inbox coming soon"
-            body="Connect Gmail in Settings to see your unread digest here." />
+          <>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-white/50">
+                  {emails.length} email{emails.length !== 1 ? 's' : ''}
+                </h3>
+                <span className="text-[10px] text-white/30">{focusSettings.gmailEmail}</span>
+              </div>
+              <Button variant="ghost" size="sm" onClick={refreshEmails} disabled={emailsRefreshing}>
+                <RefreshCw size={12} className={cn(emailsRefreshing && 'animate-spin')} />
+                {emailsRefreshing ? 'Refreshing…' : 'Refresh'}
+              </Button>
+            </div>
+            {emails.length === 0 ? (
+              <EmptyState icon={<Mail size={28} />} title="Inbox is empty"
+                body="No recent emails fetched. Click Refresh, or wait for the next 15-min poll." />
+            ) : (
+              <div className="space-y-2">
+                {emails.map(e => (
+                  <EmailCard key={e.id} email={e}
+                    onArchive={() => archiveEmail(e.id)}
+                    onDraft={() => generateReply(e.id)}
+                    isGeneratingDraft={generatingReplyFor === e.id}
+                    draft={draftReplies[e.id]}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </TabsContent>
     </div>
@@ -750,6 +832,58 @@ function EmptyState({ icon, title, body }: { icon: React.ReactNode; title: strin
       {icon}
       <p className="text-sm font-semibold text-white/70">{title}</p>
       <p className="text-xs max-w-sm">{body}</p>
+    </div>
+  )
+}
+
+function EmailCard({ email, onArchive, onDraft, isGeneratingDraft, draft }: {
+  email: EmailDigestItem
+  onArchive: () => void
+  onDraft: () => void
+  isGeneratingDraft: boolean
+  draft?: string
+}) {
+  const importanceColor = email.importance === 'high'   ? 'bg-red-500/15 text-red-300 border-red-500/30'
+                        : email.importance === 'low'    ? 'bg-white/[0.04] text-white/40 border-white/10'
+                        : 'bg-white/[0.06] text-white/60 border-white/10'
+  return (
+    <div className={cn(
+      'group rounded-lg border bg-white/[0.03] p-3 transition hover:bg-white/[0.05]',
+      email.read ? 'border-white/[0.05] opacity-70' : 'border-white/[0.10]'
+    )}>
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className={cn('text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded border font-bold', importanceColor)}>
+              {email.importance}
+            </span>
+            {!email.read && <span className="w-1.5 h-1.5 rounded-full phase-bg-soft" />}
+            <span className="text-[10px] text-white/35 ml-auto">
+              {timeAgo(email.receivedAt)}
+            </span>
+          </div>
+          <p className="text-[12px] font-semibold text-white/90 truncate">{email.subject || '(no subject)'}</p>
+          <p className="text-[11px] text-white/45 truncate mb-1">{email.from}</p>
+          <p className="text-[11px] text-white/55 line-clamp-2 leading-snug">{email.preview}</p>
+          {draft && (
+            <div className="mt-2 p-2 rounded bg-white/[0.04] border border-white/[0.08] text-[11px] text-white/80 whitespace-pre-wrap">
+              <p className="text-[9px] uppercase tracking-wider phase-text mb-1">AI draft</p>
+              {draft}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition">
+          <button onClick={onDraft} disabled={isGeneratingDraft}
+            className="text-[10px] px-2 py-1 rounded bg-white/[0.06] text-white/60 hover:bg-white/[0.12] hover:text-white flex items-center gap-1">
+            <Sparkles size={10} className={cn(isGeneratingDraft && 'animate-pulse')} />
+            {isGeneratingDraft ? '…' : 'Draft'}
+          </button>
+          <button onClick={onArchive}
+            className="text-[10px] px-2 py-1 rounded bg-white/[0.06] text-white/60 hover:bg-white/[0.12] hover:text-white flex items-center gap-1">
+            <Archive size={10} /> Archive
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
