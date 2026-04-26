@@ -19,7 +19,10 @@ import { secureStore } from '../keychain/secureStore';
 //   7. Future IMAP connects: refresh access_token if expired, then auth
 //      via XOAUTH2 SASL (see imapClient.ts)
 
-const SCOPE = 'https://mail.google.com/';
+// Mail scope (full IMAP) PLUS openid+email so we can read the user's
+// primary email address back from the userinfo endpoint. Without `email`
+// the userinfo call returns 401 / empty.
+const SCOPE = 'openid email https://mail.google.com/';
 const AUTH_URL  = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
@@ -97,7 +100,7 @@ export async function startOAuthFlow(
           finish({ ok: false, error: 'Google did not return a refresh_token. Revoke the app at https://myaccount.google.com/permissions, then try again.' });
           return;
         }
-        const email = await fetchPrimaryEmail(tokens.access_token);
+        const email = await fetchPrimaryEmail(tokens);
         focusStore.updateSettings({
           gmailEnabled: true,
           gmailEmail: email,
@@ -169,13 +172,33 @@ async function exchangeCode(
   return json as TokenResponse;
 }
 
-async function fetchPrimaryEmail(accessToken: string): Promise<string> {
+/**
+ * Get the user's primary Gmail address. Tries two sources in order:
+ *  1. The id_token's `email` claim (returned in the token exchange when
+ *     `openid email` is in the scope list — no extra HTTP call needed).
+ *  2. Fallback: the /oauth2/v2/userinfo endpoint.
+ * Throws with the underlying HTTP status so the user sees a useful error
+ * if both fail.
+ */
+async function fetchPrimaryEmail(tokens: TokenResponse): Promise<string> {
+  // 1. id_token claim
+  if (tokens.id_token) {
+    try {
+      const payload = tokens.id_token.split('.')[1];
+      const json = JSON.parse(Buffer.from(payload, 'base64').toString('utf-8'));
+      if (json.email && typeof json.email === 'string') return json.email;
+    } catch { /* fall through to userinfo */ }
+  }
+  // 2. userinfo
   const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: { Authorization: `Bearer ${tokens.access_token}` },
   });
-  if (!res.ok) throw new Error('Failed to fetch user email from Google');
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Failed to fetch user email from Google (HTTP ${res.status}): ${body.slice(0, 120)}`);
+  }
   const j = await res.json() as { email?: string };
-  if (!j.email) throw new Error('Google did not return an email address');
+  if (!j.email) throw new Error('Google did not return an email address (scope `email` missing?)');
   return j.email;
 }
 
