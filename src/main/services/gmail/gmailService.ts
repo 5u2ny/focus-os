@@ -86,11 +86,26 @@ export const gmailService = {
     const settings = focusStore.getSettings();
     if (!settings.gmailEnabled || !settings.gmailEmail) return [];
 
-    // Prefer OAuth (works for Workspace), fall back to App Password
+    // Prefer OAuth (works for Workspace), fall back to App Password.
+    // If token refresh fails (revoked credentials, expired refresh token,
+    // rotated client secret), mark Gmail as disconnected so the UI surfaces
+    // a "Reconnect Gmail" prompt instead of swallowing the error silently.
     let auth: string | { accessToken: string };
     if (settings.gmailOauthRefreshTokenEncrypted) {
-      const { accessToken } = await getValidAccessToken();
-      auth = { accessToken };
+      try {
+        const { accessToken } = await getValidAccessToken();
+        auth = { accessToken };
+      } catch (err) {
+        const msg = (err as Error).message;
+        console.error('[gmailService] Token refresh failed — disconnecting Gmail:', msg);
+        focusStore.updateSettings({
+          gmailEnabled: false,
+          gmailOauthAccessTokenEncrypted: undefined,
+          gmailOauthAccessTokenExpiresAt: undefined,
+        });
+        // Re-throw so the caller's catch block can show the user a banner
+        throw new Error(`Gmail disconnected: ${msg}. Open Settings → Gmail to reconnect.`);
+      }
     } else if (settings.gmailAppPasswordEncrypted) {
       auth = secureStore.decrypt(settings.gmailAppPasswordEncrypted);
     } else {

@@ -1,75 +1,50 @@
 # Focus OS
 
-A local-first focus command center for macOS. Timer, highlight-anywhere capture,
-notes, AI email triage, todo, and calendar — all in one always-visible pill.
+A local-first, Spotlight-style productivity HUD for macOS. Always-on-top pill
+with a Pomodoro timer, auto-capture of any text you highlight, todos,
+calendar, and an AI-triaged Gmail inbox — all under one glass surface.
 
-## Install (60 seconds)
+## Install
 
 ```bash
 git clone https://github.com/5u2ny/focus-pomodoro-app
 cd focus-pomodoro-app
-npm install
+npm install        # also rebuilds the native uiohook-napi module
 npm start
 ```
 
-> **macOS note:** `npm install` runs `electron-rebuild` automatically to compile
-> the native robotjs module for your Electron version. Python 3 and Xcode Command
-> Line Tools must be installed (`xcode-select --install`).
+Requires macOS, Node 20+, and Xcode Command Line Tools
+(`xcode-select --install`). On first launch, grant **Accessibility**
+permission to Focus OS in System Settings → Privacy & Security so the global
+mouse hook can drive auto-capture.
 
-## Features
+## Use
 
-| Module | What it does |
-|--------|-------------|
-| **Pill timer** | Always-on-top Pomodoro HUD — click to start/pause, auto-advances phases |
-| **Highlight capture** | Press `Cmd+Shift+C` anywhere to save selected text as a Capture |
-| **Notes** | Full rich-text editor (TipTap) with drag-insert from captures |
-| **AI email triage** | IMAP Gmail fetch, zero-shot importance scoring, one-click draft reply |
-| **Todo** | Inline task list with active-task indicator visible in the HUD |
-| **Calendar** | 7-day event strip, local CRUD, no cloud sync required |
+- **Timer** — click the pill to start/pause. `Cmd+Enter` toggles from
+  anywhere. The HUD auto-shrinks to a Dynamic Island after 8s of focus and
+  re-expands on break.
+- **Capture** — highlight text in any app and release the mouse. Focus OS
+  detects the drag, briefly synthesizes `Cmd+C`, restores your clipboard, and
+  saves the selection to the **Saves** tab. Manual fallbacks: `Cmd+Shift+C`,
+  `Cmd+Option+C`, `Cmd+Shift+9`.
+- **Inbox** — connect Gmail in **Settings → Gmail**. Recommended path is
+  "Sign in with Google" (OAuth2, works for Workspace). App Password is kept
+  as a legacy option. Email is hidden during focus sessions.
+- **Tabs** — `Cmd+1..5` switches between Focus / Saves / Tasks / Calendar /
+  Inbox. `Cmd+K` focuses the task input. `Esc` collapses; `Esc Esc` minimizes
+  to the island (suppressed while a session is running).
 
-## Keyboard shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `Cmd+Shift+Space` | Toggle timer start/pause |
-| `Cmd+Shift+C` | Capture highlighted text from any app |
-| `Cmd+Shift+P` | Show/hide the pill |
-
-## AI & Privacy
-
-Focus OS runs all AI locally by default (distilbert via @xenova/transformers —
-downloaded once, cached in `~/Library/Application Support/focus-os`).
-
-Optionally connect Anthropic or OpenAI in **Settings → AI** for richer email
-summaries and draft replies. Your API key is encrypted with Electron safeStorage
-and never leaves your machine.
-
-Gmail is accessed via IMAP with an App Password — Focus OS never stores your
-Google account credentials.
-
-## Blackboard LMS
-
-The original Pomodoro app's Blackboard integration is preserved. Connect in
-**Settings → Blackboard** with your institution URL and session cookie.
-
-## Development
-
-```bash
-npm run dev:renderer   # Hot-reload renderer only
-npm run build:main     # Compile main process
-npm run build          # Full production build
-npm run typecheck      # TypeScript check without emit
-```
+API keys (Anthropic / OpenAI) and Gmail tokens are encrypted via macOS
+Keychain (`safeStorage`) and never leave your machine except to the provider
+you chose.
 
 ## Stack
 
-- **Electron 31** + React 18 + TypeScript 5.5
-- **electron-store v7** — local-first JSON persistence
-- **TipTap 2** — rich-text notes editor
-- **@xenova/transformers** — on-device zero-shot classification
-- **robotjs** — system-level keyboard simulation for capture
-- **imap + mailparser** — pure-JS Gmail IMAP client
+Electron 31 · React 18 · TypeScript 5.5 · Vite · Tailwind · Radix UI ·
+TipTap 2 (notes) · `uiohook-napi` (global mouse hook for capture) ·
+`electron-store` v7 (local JSON persistence) · `imapflow` + `mailparser`
+(Gmail IMAP with XOAUTH2) · `@xenova/transformers` (on-device zero-shot
+classification, optional).
 
-## License
-
-MIT
+See [`CLAUDE.md`](./CLAUDE.md) for the architecture deep-dive and
+[`CONTRIBUTING.md`](./CONTRIBUTING.md) for dev workflow. MIT licensed.

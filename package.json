@@ -11,7 +11,8 @@
     "postinstall": "echo 'no native rebuild needed'",
     "dist:mac": "npm run build && electron-builder --mac --dir",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "dev:renderer": "vite"
+    "dev:renderer": "vite",
+    "test": "vitest run"
   },
   "author": "Sunny Soni",
   "devDependencies": {

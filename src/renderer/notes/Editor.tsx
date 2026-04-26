@@ -3,6 +3,8 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import type { Note, Capture } from '@schema'
+import { parseContent } from './parseContent'
+export { parseContent }
 
 interface Props {
   note: Note
@@ -13,20 +15,6 @@ interface Props {
 export function Editor({ note, captures, onUpdate }: Props) {
   const saveTimer = useRef<number>(0)
   const lastContent = useRef<string>(note.content)
-
-  // Safely parse stored TipTap JSON. An empty/invalid string MUST become an
-  // empty string (TipTap accepts that) — never `{}`, which is not a valid
-  // ProseMirror doc and throws "Invalid content for node doc" on first render.
-  const parseContent = (raw: string): any => {
-    if (!raw || raw === '{}') return ''
-    try {
-      const parsed = JSON.parse(raw)
-      if (!parsed || typeof parsed !== 'object' || parsed.type !== 'doc') return ''
-      return parsed
-    } catch {
-      return ''
-    }
-  }
 
   const editor = useEditor({
     extensions: [StarterKit, Underline],

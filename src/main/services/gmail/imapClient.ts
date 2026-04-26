@@ -18,7 +18,7 @@ const TIMEOUT_MS = 30_000;
  * then base64-encoded. The `imap` library accepts this directly via the
  * `xoauth2` constructor option.
  */
-function buildXOAuth2(email: string, accessToken: string): string {
+export function buildXOAuth2(email: string, accessToken: string): string {
   const raw = `user=${email}\x01auth=Bearer ${accessToken}\x01\x01`;
   return Buffer.from(raw).toString('base64');
 }

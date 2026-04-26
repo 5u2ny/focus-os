@@ -1,7 +1,5 @@
-import { app, globalShortcut, clipboard, Notification } from 'electron';
+import { globalShortcut, clipboard, Notification } from 'electron';
 import { execFile } from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
 import { v4 as uuid } from 'uuid';
 import { focusStore } from '../store';
 import { checkAccessibilityPermission } from './permissionCheck';
@@ -52,96 +50,18 @@ function captureViaClipboard(): Promise<string> {
 }
 
 // ── Read selected text via macOS Accessibility API (no clipboard touch) ──────
-// Previously this spawned `swift -e <snippet>` on every poll, which recompiled
-// the helper each time (1-3s startup). Now we compile it ONCE on first run,
-// cache the binary in `userData`, then `execFile` the binary on each poll
-// (~10-30ms). The binary prints selected text to stdout, exits 0.
-const SWIFT_SOURCE = `
-import Cocoa
-let elem = AXUIElementCreateSystemWide()
-var focused: AnyObject?
-AXUIElementCopyAttributeValue(elem, kAXFocusedUIElementAttribute as CFString, &focused)
-if let el = focused {
-  var sel: AnyObject?
-  AXUIElementCopyAttributeValue(el as! AXUIElement, kAXSelectedTextAttribute as CFString, &sel)
-  if let text = sel as? String, !text.isEmpty {
-    print(text)
-  }
-}
-`;
+// (Previously: a Swift helper binary was compiled to userData and spawned
+//  every poll to read AXSelectedText. macOS won't grant Accessibility
+//  permission to a child binary spawned by Electron — the helper returned
+//  empty no matter what. The mouse-up + osascript Cmd+C path replaced
+//  this entirely. Removing the dead code keeps the boot path clean and
+//  prevents future maintainers from going down that dead end.)
 
-let helperBinaryPath: string | null = null;
-let helperBuildAttempted = false;
-
-function getHelperPath(): string {
-  return path.join(app.getPath('userData'), 'ax-selection-reader');
-}
-
-/**
- * Compile the Swift helper once, cache it under userData. Returns the binary
- * path on success, or null if compilation failed (e.g. xcrun missing).
- */
-async function ensureHelperBuilt(): Promise<string | null> {
-  if (helperBinaryPath) return helperBinaryPath;
-  if (helperBuildAttempted) return null;
-  helperBuildAttempted = true;
-
-  const target = getHelperPath();
-  if (fs.existsSync(target)) { helperBinaryPath = target; return target; }
-
-  const sourcePath = path.join(app.getPath('userData'), 'ax-selection-reader.swift');
-  fs.writeFileSync(sourcePath, SWIFT_SOURCE);
-
-  return new Promise((resolve) => {
-    // `xcrun -f swiftc` then compile. swiftc is faster + more reliable than swift -e.
-    execFile('xcrun', ['swiftc', '-O', sourcePath, '-o', target], { timeout: 30_000 }, (err) => {
-      if (err) {
-        console.warn('[captureService] Failed to compile helper:', err.message);
-        resolve(null);
-      } else {
-        helperBinaryPath = target;
-        console.log(`[captureService] Compiled AX helper -> ${target}`);
-        resolve(target);
-      }
-    });
-  });
-}
-
-// Periodic logging so we can debug "I highlighted but nothing saved".
-let _axCallCounter = 0;
-const AX_LOG_EVERY = 5;
-
-// AppleScript-based AX read. Unlike a spawned `swift` binary, osascript talks
-// to the System Events daemon which already has the AX privileges it needs.
-// This means we can read AXSelectedText from any focused control without
-// granting AX to a helper binary, and WITHOUT touching the clipboard.
-const AX_READ_SCRIPT = `try
-  tell application "System Events"
-    set procs to every process whose frontmost is true
-    if (count of procs) is 0 then return ""
-    set frontProc to item 1 of procs
-    set focusedEl to value of attribute "AXFocusedUIElement" of frontProc
-    set selText to value of attribute "AXSelectedText" of focusedEl
-    if selText is missing value then return ""
-    return selText
-  end tell
-on error
-  return ""
-end try`;
-
-function readSelectedTextViaAX(): Promise<string> {
-  return new Promise((resolve) => {
-    execFile('osascript', ['-e', AX_READ_SCRIPT], { timeout: 1500 }, (err, stdout, stderr) => {
-      _axCallCounter++;
-      const text = err ? '' : stdout.trim();
-      if (_axCallCounter % AX_LOG_EVERY === 0 || text.length > 0) {
-        const stderrStr = stderr ? String(stderr).trim() : '';
-        console.log(`[ax] poll#${_axCallCounter} text.len=${text.length}${err ? ` err=${err.message.slice(0,60)}` : ''}${stderrStr ? ` stderr=${stderrStr.slice(0,80)}` : ''}`);
-      }
-      resolve(text);
-    });
-  });
-}
+// (Previously: an osascript-via-System-Events AXSelectedText read. Worked for
+//  native apps but returned "missing value" for every Electron-based app
+//  (Claude desktop, VSCode, Slack, Cursor, Notion, Discord). Replaced by the
+//  mouse-up + Cmd+C synthesis pattern in startAutoCapturePoll, which works
+//  in EVERY app because it doesn't depend on AX exposure.)
 
 // ── Auto-capture: watch for selection changes ────────────────────────────────
 // Poll AXSelectedText every ~600ms. When text appears, wait for it to be stable
@@ -341,29 +261,17 @@ export class CaptureService {
     this.autoCategorizeAsync(capture);
   }
 
-  // ── Core capture ──────────────────────────────────────────────────────────
-  private async captureSelection(source: 'highlight' | 'shortcut' = 'highlight') {
-    // For manual shortcut: use clipboard first (it works without per-binary AX
-    // grants). For auto-poll: try AX first; if it returned nothing AND we
-    // somehow got here, fall through to clipboard as last resort.
-    let text = '';
-    if (source === 'shortcut') {
-      console.log('[captureService] Manual shortcut → trying clipboard capture');
-      text = await captureViaClipboard();
-      if (text) console.log(`[captureService] Clipboard capture succeeded: ${text.length} chars`);
-    } else {
-      // Auto-poll already verified AX returned text (otherwise we wouldn't be here)
-      text = await readSelectedTextViaAX();
-    }
-
+  // ── Manual shortcut capture (Cmd+Shift+C / Cmd+Option+C / Cmd+Shift+9) ───
+  // Uses the clipboard path. The auto-watch path (mouse-up) lives in
+  // captureFromMouseUp — these two are the only ways captures fire.
+  private async captureSelection(source: 'shortcut' = 'shortcut') {
+    console.log('[captureService] Manual shortcut → trying clipboard capture');
+    const text = await captureViaClipboard();
     if (!text) {
-      console.log('[captureService] Nothing captured (no selection or AX denied for helper binary)');
+      console.log('[captureService] Nothing captured (no selection in focused app)');
       return;
     }
-    if (text.length < MIN_AUTO_LENGTH && source === 'highlight') {
-      console.log(`[captureService] Suppressing auto-capture: only ${text.length} chars`);
-      return;
-    }
+    console.log(`[captureService] Clipboard capture succeeded: ${text.length} chars`);
 
     // Get source app/URL for provenance
     let sourceApp: string | undefined;
