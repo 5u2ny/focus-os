@@ -139,6 +139,9 @@ export function setupIPC() {
     const result = await gmailService.connect(r.email, r.appPassword);
     if (result.ok) {
       gmailService.startPolling((items) => windowManager.sendToFloating('gmail:newEmails', items));
+      gmailService.fetchNow()
+        .then((items) => windowManager.sendToFloating('gmail:newEmails', items))
+        .catch((err) => console.error('[gmailService] Initial fetch failed:', err));
     }
     return result;
   });
@@ -147,6 +150,11 @@ export function setupIPC() {
     const result = await gmailService.oauthConnect(r.clientId, r.clientSecret);
     if (result.ok) {
       gmailService.startPolling((items) => windowManager.sendToFloating('gmail:newEmails', items));
+      // Kick an immediate fetch so the user sees their inbox right away
+      // instead of waiting for the next 15-min poll tick.
+      gmailService.fetchNow()
+        .then((items) => windowManager.sendToFloating('gmail:newEmails', items))
+        .catch((err) => console.error('[gmailService] Initial fetch failed:', err));
     }
     return result;
   });

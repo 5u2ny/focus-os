@@ -78,6 +78,14 @@ app.whenReady().then(async () => {
     gmailService.startPolling((items) => {
       windowManager.sendToFloating('gmail:newEmails', items);
     });
+    // Kick an immediate fetch so the Inbox is populated on app launch
+    // instead of waiting for the next interval tick.
+    gmailService.fetchNow()
+      .then((items) => {
+        console.log(`[main] Initial Gmail fetch: ${items.length} emails`);
+        windowManager.sendToFloating('gmail:newEmails', items);
+      })
+      .catch((err) => console.error('[main] Initial Gmail fetch failed:', err.message));
   }
 
   // ── Multi-display support ─────────────────────────────────────────────
