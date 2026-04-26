@@ -484,20 +484,32 @@ export default function App() {
         </TabsTrigger>
       </TabsList>
 
-      {/* Action buttons — clearly grouped and labeled */}
-      <div className="no-drag flex items-center gap-1">
-        <Button variant="icon" size="iconSm" onClick={handleReset} title="Reset timer"><RotateCcw size={13} /></Button>
-        <Button variant="icon" size="iconSm" onClick={openSettings} title="Settings"><SettingsIcon size={13} /></Button>
-        <Button variant="icon" size="iconSm" onClick={toggleExpanded}
-          title={expanded ? 'Collapse panel (Esc)' : 'Expand panel'}>
-          <ChevronUp size={13} className={cn('transition-transform', expanded && 'rotate-180')} />
-        </Button>
-        <Button variant="icon" size="iconSm" onClick={() => {
-          setIsIsland(true)
-          window.focusAPI.resizeWindow(ISLAND.h, ISLAND.w, true)
-        }} title="Minimize to island (Esc Esc)">
-          <Minus size={13} />
-        </Button>
+      {/* Action buttons — Apple HIG: "Group items that perform similar actions
+          or affect the same part of the interface." Two segments:
+          (1) utility actions (Reset / Settings)
+          (2) layout actions (Expand panel / Minimize to island)
+          Each segment shares a subtle background; 4px gap between segments. */}
+      <div className="no-drag flex items-center gap-1.5">
+        <div className="toolbar-segment">
+          <Button variant="icon" size="iconSm" onClick={handleReset} title="Reset timer">
+            <RotateCcw size={13} />
+          </Button>
+          <Button variant="icon" size="iconSm" onClick={openSettings} title="Settings">
+            <SettingsIcon size={13} />
+          </Button>
+        </div>
+        <div className="toolbar-segment">
+          <Button variant="icon" size="iconSm" onClick={toggleExpanded}
+            title={expanded ? 'Collapse panel (Esc)' : 'Expand panel'}>
+            <ChevronUp size={13} className={cn('transition-transform', expanded && 'rotate-180')} />
+          </Button>
+          <Button variant="icon" size="iconSm" onClick={() => {
+            setIsIsland(true)
+            window.focusAPI.resizeWindow(ISLAND.h, ISLAND.w, true)
+          }} title="Minimize to island (Esc Esc)">
+            <Minus size={13} />
+          </Button>
+        </div>
       </div>
     </div>
   )
@@ -508,16 +520,16 @@ export default function App() {
   const Content = (
     <div className="border-t border-white/5">
       {/* FOCUS — current state, cycle progress, quick actions */}
-      <TabsContent value="focus" className="p-4 h-[336px] overflow-y-auto pretty-scroll space-y-3">
+      <TabsContent value="focus" className="p-4 h-[336px] overflow-y-auto pretty-scroll scroll-edge-top space-y-3">
         <div className="grid grid-cols-2 gap-4">
-          <Card title="Working On">
+          <Card title="Working on">
             {taskInput ? (
               <p className="text-base font-semibold text-white">{taskInput}</p>
             ) : (
               <p className="text-sm italic text-white/30">Type your task in the bar above</p>
             )}
           </Card>
-          <Card title="Cycle Progress">
+          <Card title="Cycle progress">
             <div className="flex gap-1.5 mb-2">
               {Array.from({ length: cycleTotal }).map((_, i) => (
                 <div key={i}
@@ -538,7 +550,7 @@ export default function App() {
           </Card>
         </div>
 
-        <Card title="Stats Today">
+        <Card title="Stats today">
           <div className="grid grid-cols-3 gap-4">
             <Stat label="Sessions" value={state.cycleCount} />
             <Stat label="Captures" value={captures.length} />
@@ -546,9 +558,9 @@ export default function App() {
           </div>
         </Card>
 
-        <Card title="Quick Actions">
+        <Card title="Quick actions">
           <div className="flex gap-2 flex-wrap">
-            <Button variant="phase" size="sm" onClick={handleStartPause}>
+            <Button variant="glassProminent" size="sm" onClick={handleStartPause}>
               {inSession ? <><Pause size={12} /> Pause</> : <><Play size={12} fill="currentColor" /> Start Focus</>}
             </Button>
             <Button variant="default" size="sm" onClick={() => ipc.invoke('window:openNotes', {})}>
@@ -579,7 +591,7 @@ export default function App() {
       </TabsContent>
 
       {/* SAVES — captures grid */}
-      <TabsContent value="saves" className="p-4 h-[336px] overflow-y-auto pretty-scroll">
+      <TabsContent value="saves" className="p-4 h-[336px] overflow-y-auto pretty-scroll scroll-edge-top">
         {/* How-to banner — manual capture works on every install */}
         <div className="mb-3 rounded-lg border border-white/[0.10] bg-white/[0.03] p-3 flex items-start gap-3">
           <Bookmark size={16} className="phase-text flex-shrink-0 mt-0.5" />
@@ -608,7 +620,7 @@ export default function App() {
           </div>
         )}
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-white/50">
+          <h3 className="text-xs font-semibold text-white/55">
             {captures.length} highlight{captures.length !== 1 ? 's' : ''} captured
           </h3>
           <Button variant="ghost" size="sm" onClick={() => ipc.invoke('window:openNotes', {})}>
@@ -623,7 +635,7 @@ export default function App() {
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {captures.map(c => (
-              <div key={c.id} className="group rounded-lg bg-white/[0.04] border border-white/[0.06] p-3 hover:bg-white/[0.07] hover:border-white/[0.14] transition">
+              <div key={c.id} className="group rounded-lg border border-white/[0.06] p-3 hover:bg-white/[0.05] hover:border-white/[0.14] transition">
                 <p className="text-[13px] text-white/85 leading-snug line-clamp-3">{c.text}</p>
                 <div className="flex items-center gap-2 mt-2 text-[10px] text-white/40">
                   {c.sourceApp && <span className="truncate">📍 {c.sourceApp}</span>}
@@ -641,7 +653,7 @@ export default function App() {
       </TabsContent>
 
       {/* TASKS — full todo list */}
-      <TabsContent value="tasks" className="p-4 h-[336px] overflow-y-auto pretty-scroll space-y-3">
+      <TabsContent value="tasks" className="p-4 h-[336px] overflow-y-auto pretty-scroll scroll-edge-top space-y-3">
         <div className="flex gap-2 sticky top-0 -mt-1 pt-1 pb-1 bg-gradient-to-b from-[rgba(14,14,18,0.98)] via-[rgba(14,14,18,0.95)] to-transparent z-10">
           <Input value={newTodo} onChange={e => setNewTodo(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addTodo()} placeholder="Add a task…" />
@@ -659,7 +671,7 @@ export default function App() {
             ))}
             {todos.some(t => t.completed) && (
               <div className="pt-3 mt-3 border-t border-white/5">
-                <p className="text-[10px] uppercase tracking-wider text-white/30 mb-2">Completed</p>
+                <p className="text-[11px] font-semibold text-white/40 mb-2">Completed</p>
                 {todos.filter(t => t.completed).map(t => (
                   <TodoRow key={t.id} todo={t} phaseColor={phaseColor}
                     onToggle={() => toggleTodo(t)} onActivate={() => setActiveTodo(t)} />
@@ -671,7 +683,7 @@ export default function App() {
       </TabsContent>
 
       {/* CALENDAR — today's events */}
-      <TabsContent value="calendar" className="p-4 h-[336px] overflow-y-auto pretty-scroll space-y-3">
+      <TabsContent value="calendar" className="p-4 h-[336px] overflow-y-auto pretty-scroll scroll-edge-top space-y-3">
         <div className="flex gap-2">
           <Input value={newEventTitle} onChange={e => setNewEventTitle(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addEvent()}
@@ -684,7 +696,7 @@ export default function App() {
           </Button>
         </div>
 
-        <p className="text-[10px] uppercase tracking-wider text-white/40 mt-2">
+        <p className="text-[11px] font-semibold text-white/45 mt-2">
           {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
 
@@ -726,7 +738,7 @@ export default function App() {
       </TabsContent>
 
       {/* INBOX */}
-      <TabsContent value="inbox" className="p-4 h-[336px] overflow-y-auto pretty-scroll">
+      <TabsContent value="inbox" className="p-4 h-[336px] overflow-y-auto pretty-scroll scroll-edge-top">
         {inSession ? (
           <div className="flex items-center gap-2 text-sm text-white/60 bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
             🔒 Email is hidden during focus sessions. Check it on your break.
@@ -738,7 +750,7 @@ export default function App() {
           <>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-white/50">
+                <h3 className="text-xs font-semibold text-white/55">
                   {emails.length} email{emails.length !== 1 ? 's' : ''}
                 </h3>
                 <span className="text-[10px] text-white/30">{focusSettings.gmailEmail}</span>
@@ -783,7 +795,7 @@ export default function App() {
   return (
     <div className="h-full w-full p-3">
       <div className={cn(
-        'spotlight-surface rounded-2xl overflow-hidden h-full w-full',
+        'spotlight-surface rounded-3xl overflow-hidden h-full w-full',
         inSession && 'is-running'
       )}>
         {/* Single Radix Tabs Root wraps both Header and Content so trigger ↔ panel
@@ -809,9 +821,12 @@ function KeyHint({ k, label }: { k: string; label: string }) {
 
 // ── Sub-components ──────────────────────────────────────────────────────────
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
+  // Apple Liquid Glass: reduced custom backgrounds; let the parent material
+  // show through. Border alone defines separation; no fill that fights the
+  // vibrancy. Title-cased per Apple's "no ALL CAPS section headers" rule.
   return (
-    <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-2">{title}</p>
+    <div className="rounded-xl border border-white/[0.06] p-4">
+      <p className="text-[11px] font-semibold text-white/55 mb-2">{title}</p>
       {children}
     </div>
   )
@@ -821,7 +836,7 @@ function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div>
       <p className="text-2xl font-bold tabular-nums">{value}</p>
-      <p className="text-[10px] uppercase tracking-wider text-white/40">{label}</p>
+      <p className="text-[11px] text-white/45">{label}</p>
     </div>
   )
 }
@@ -848,7 +863,7 @@ function EmailCard({ email, onArchive, onDraft, isGeneratingDraft, draft }: {
                         : 'bg-white/[0.06] text-white/60 border-white/10'
   return (
     <div className={cn(
-      'group rounded-lg border bg-white/[0.03] p-3 transition hover:bg-white/[0.05]',
+      'group rounded-lg border p-3.5 transition hover:bg-white/[0.04]',
       email.read ? 'border-white/[0.05] opacity-70' : 'border-white/[0.10]'
     )}>
       <div className="flex items-start gap-2">
@@ -893,8 +908,8 @@ function TodoRow({ todo, phaseColor, onToggle, onActivate }:
 ) {
   return (
     <div className={cn(
-      'group flex items-center gap-3 px-3 py-2 rounded-lg transition',
-      todo.isActive ? 'bg-white/[0.07] border border-white/[0.10]' : 'hover:bg-white/[0.04] border border-transparent'
+      'group flex items-center gap-3 px-3.5 py-2.5 rounded-lg transition',
+      todo.isActive ? 'bg-white/[0.06] border border-white/[0.10]' : 'hover:bg-white/[0.04] border border-transparent'
     )}>
       <button onClick={onToggle} className="flex-shrink-0">
         {todo.completed

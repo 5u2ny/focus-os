@@ -11,6 +11,11 @@ const buttonVariants = cva(
         phase:   'phase-bg-soft phase-text phase-border border hover:bg-[rgba(var(--phase-r),var(--phase-g),var(--phase-b),0.22)] hover:phase-glow',
         ghost:   'text-white/60 hover:bg-white/[0.06] hover:text-white',
         icon:    'text-white/45 hover:text-white hover:bg-white/[0.08] border border-white/[0.08] hover:border-white/20',
+        // Apple Liquid Glass button styles (per HIG glass / glassProminent):
+        // .glass = subtle translucent tint with bright top rim — secondary actions
+        glass:   'text-white/90 border border-white/[0.18] bg-white/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.30)] backdrop-blur-md hover:bg-white/[0.12] hover:border-white/30',
+        // .glassProminent = phase-tinted version, more saturated — primary CTA on a glass surface
+        glassProminent: 'phase-text border phase-border bg-[rgba(var(--phase-r),var(--phase-g),var(--phase-b),0.18)] shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_0_18px_rgba(var(--phase-r),var(--phase-g),var(--phase-b),0.20)] backdrop-blur-md hover:bg-[rgba(var(--phase-r),var(--phase-g),var(--phase-b),0.28)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_0_28px_rgba(var(--phase-r),var(--phase-g),var(--phase-b),0.40)]',
       },
       size: {
         default: 'h-8 px-3',

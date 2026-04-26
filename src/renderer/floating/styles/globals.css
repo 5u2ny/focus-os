@@ -84,6 +84,40 @@
       0 0 60px 12px rgba(var(--phase-r), var(--phase-g), var(--phase-b), 0.12);
   }
 
+  /* ─── Apple HIG: prefers-reduced-transparency fallback ─────────────────
+     "People can turn on accessibility settings that reduce transparency or
+     motion in the interface. These settings can remove or modify certain
+     effects." When this is on, drop the backdrop-filter (which is also
+     expensive) and serve a near-opaque dark surface. */
+  @media (prefers-reduced-transparency: reduce) {
+    .spotlight-surface {
+      background: rgba(20, 20, 28, 0.95);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+  }
+
+  /* Scroll-edge effect: an 8px gradient at the top of expanded panels
+     fades content scrolling beneath the bar header — Apple uses this
+     same pattern on iOS toolbars to maintain control legibility. */
+  .scroll-edge-top {
+    mask-image: linear-gradient(to bottom, transparent 0, #000 8px);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 8px);
+  }
+
+  /* Grouped toolbar items (Apple HIG: "Group items that perform similar
+     actions"). Each segment gets a shared subtle background; spacers
+     between segments separate functional groups. */
+  .toolbar-segment {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+  }
+
   .drag-region { -webkit-app-region: drag; }
   .no-drag { -webkit-app-region: no-drag; }
 

@@ -154,7 +154,7 @@ export function SettingsPanel({ settings, focusSettings, onSave, onClose }: Prop
       <div className="flex items-center justify-between px-5 h-12 border-b border-white/[0.06] flex-shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold">Settings</span>
-          <span className="text-[10px] uppercase tracking-wider text-white/30">Esc to close</span>
+          <span className="text-[11px] text-white/40">Esc to close</span>
         </div>
         <button onClick={onClose}
           className="w-7 h-7 rounded-md flex items-center justify-center text-white/45 hover:text-white hover:bg-white/[0.08] transition">
@@ -322,7 +322,7 @@ export function SettingsPanel({ settings, focusSettings, onSave, onClose }: Prop
                 <p className="text-xs text-white/55 mb-3">
                   Click below — your browser will open, you'll sign in to Google, grant Mail access, and you're done. Tokens are stored encrypted in your macOS Keychain.
                 </p>
-                <Button variant="phase" size="lg" onClick={() => handleConnectGmailOAuth()}
+                <Button variant="glassProminent" size="lg" onClick={() => handleConnectGmailOAuth()}
                   disabled={gmailStatus === 'connecting' || keychainOk === false}>
                   {gmailStatus === 'connecting'
                     ? 'Waiting for Google sign-in in browser…'
@@ -422,7 +422,7 @@ export function SettingsPanel({ settings, focusSettings, onSave, onClose }: Prop
                       className="font-mono text-[11px]" />
                   </Field>
 
-                  <Button variant="phase" size="lg" onClick={handleConnectGmailOAuth}
+                  <Button variant="glassProminent" size="lg" onClick={handleConnectGmailOAuth}
                     disabled={gmailStatus === 'connecting' || !oauthClientId || !oauthClientSecret || keychainOk === false}
                     className="w-full justify-center">
                     {gmailStatus === 'connecting'
@@ -441,8 +441,8 @@ export function SettingsPanel({ settings, focusSettings, onSave, onClose }: Prop
             {/* ── App Password mode (legacy — won't work for Workspace) ── */}
             {gmailMode === 'app-password' && (
               <>
-                <div className="rounded-lg bg-white/[0.03] border border-white/[0.08] p-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-white/45 mb-3">
+                <div className="rounded-lg border border-white/[0.06] p-4">
+                  <p className="text-xs font-semibold text-white/60 mb-3">
                     Setup
                   </p>
                   <ol className="space-y-2.5 text-xs text-white/75">
@@ -572,7 +572,7 @@ export function SettingsPanel({ settings, focusSettings, onSave, onClose }: Prop
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-3">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">{title}</p>
+      <p className="text-[11px] font-semibold text-white/55">{title}</p>
       <div className="space-y-3">{children}</div>
     </div>
   )
