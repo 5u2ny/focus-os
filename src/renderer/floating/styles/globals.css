@@ -41,29 +41,43 @@
     -webkit-font-smoothing: antialiased;
     user-select: none;
     -webkit-app-region: no-drag;
+    /* Subtle dark text shadow keeps white text readable over the lighter
+       glass material on bright wallpapers — no need for a heavy dark wash. */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
   }
 }
 
 @layer components {
-  /* Spotlight-style frosted command bar — the hero surface */
-  /* The window itself uses Electron `vibrancy: 'hud'` for the macOS material;
-     the CSS adds a darker wash on top so content stays readable against
-     bright wallpapers. Pure vibrancy alone makes white text invisible on
-     light backgrounds — we trade some translucency for contrast. */
+  /* Spotlight-style frosted command bar — pure glass morphism */
+  /* The BrowserWindow uses Electron `vibrancy: 'hud'` for the macOS material;
+     here we paint only a thin tint + crisp white rim so the surface reads as
+     ONE unified glass slab — no more "vibrancy material with a black pill
+     floating inside it" sandwich. Tint is kept low so the native blur shows
+     through; the rim and inner highlight do the work of defining the edge. */
   .spotlight-surface {
-    background: rgba(12, 12, 16, 0.66);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-top-color: rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(24px) saturate(1.5);
+    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+    border: 1px solid rgba(255, 255, 255, 0.20);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.45),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.30);
+      /* Top specular highlight — the signature glass-morphism gleam */
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      /* Soft inner lift */
+      inset 0 0 24px rgba(255, 255, 255, 0.04),
+      /* Subtle bottom shadow for depth */
+      inset 0 -1px 0 rgba(0, 0, 0, 0.15),
+      /* Drop shadow */
+      0 6px 24px rgba(0, 0, 0, 0.22);
   }
 
   .spotlight-surface.is-running {
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.40),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.20),
-      0 0 18px 2px rgba(var(--phase-r), var(--phase-g), var(--phase-b), 0.28);
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      inset 0 0 24px rgba(255, 255, 255, 0.04),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.15),
+      0 6px 24px rgba(0, 0, 0, 0.22),
+      /* Phase-tinted ambient halo — subtle, not the dominant color */
+      0 0 22px 2px rgba(var(--phase-r), var(--phase-g), var(--phase-b), 0.32);
   }
 
   .drag-region { -webkit-app-region: drag; }

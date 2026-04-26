@@ -216,6 +216,17 @@ export class CaptureService {
   private mouseDownX = 0;
   private mouseDownY = 0;
   private hookStarted = false;
+  // True while a captureFromMouseUp is in progress. Prevents queued osascript
+  // spawns from piling up when the user does many drags in quick succession.
+  // (Was the root cause of "the app freezes when I drag windows around.")
+  private captureInFlight = false;
+  // Min ms between consecutive auto-captures, regardless of selection content.
+  // 800ms feels instant for selection workflows but rate-limits window/scroll drags.
+  private static readonly MOUSEUP_COOLDOWN_MS = 800;
+  private lastMouseupCaptureAt = 0;
+  // Drag must be at least this many pixels — filters out idle clicks AND tiny
+  // accidental wiggles that happen when releasing a normal click.
+  private static readonly DRAG_THRESHOLD_PX = 12;
 
   private startAutoCapturePoll() {
     if (this.hookStarted) return;
@@ -223,15 +234,26 @@ export class CaptureService {
       uIOhook.on('mousedown', (e: UiohookMouseEvent) => {
         this.mouseDownX = e.x;
         this.mouseDownY = e.y;
-        console.log(`[hook] mousedown @ (${e.x},${e.y}) button=${e.button}`);
       });
       uIOhook.on('mouseup', (e: UiohookMouseEvent) => {
+        if (e.button !== 1) return;
         const dx = Math.abs(e.x - this.mouseDownX);
         const dy = Math.abs(e.y - this.mouseDownY);
-        console.log(`[hook] mouseup   @ (${e.x},${e.y}) button=${e.button} drag=${dx + dy}px`);
-        if (e.button !== 1) return;
-        if (dx + dy < 5) return;
-        setTimeout(() => this.captureFromMouseUp(), 80);
+        // Drag too short → not a text selection (just a click or tiny wiggle)
+        if (dx + dy < CaptureService.DRAG_THRESHOLD_PX) return;
+        // Already capturing → skip; prevents osascript queue buildup
+        if (this.captureInFlight) return;
+        // Cooldown — don't fire faster than 800ms even if user is dragging
+        // wildly. This is what stops the app from feeling "frozen" when the
+        // user moves a window or selects across multiple lines rapidly.
+        const now = Date.now();
+        if (now - this.lastMouseupCaptureAt < CaptureService.MOUSEUP_COOLDOWN_MS) return;
+        this.lastMouseupCaptureAt = now;
+        this.captureInFlight = true;
+        // 80ms settle so the host app finishes updating its selection state
+        setTimeout(() => {
+          this.captureFromMouseUp().finally(() => { this.captureInFlight = false; });
+        }, 80);
       });
       uIOhook.start();
       this.hookStarted = true;
@@ -244,13 +266,14 @@ export class CaptureService {
   /**
    * Save current clipboard, send Cmd+C via osascript, read what landed,
    * restore original clipboard, dedupe, save. Works in every app.
+   * MUST be guarded by `captureInFlight` upstream — concurrent invocations
+   * race the clipboard state and corrupt restoration.
    */
   private async captureFromMouseUp() {
     const originalText  = clipboard.readText() || '';
     const originalImage = clipboard.readImage();
     const hadImage      = !originalImage.isEmpty();
 
-    // Clear so we can detect whether Cmd+C actually wrote anything new
     clipboard.clear();
 
     await new Promise<void>((resolve) => {
@@ -259,19 +282,17 @@ export class CaptureService {
         () => resolve()
       );
     });
-    // Brief settle
     await new Promise(r => setTimeout(r, 90));
 
     const captured = clipboard.readText().trim();
 
-    // Restore the user's original clipboard before doing anything else
-    if (hadImage)            clipboard.writeImage(originalImage);
-    else if (originalText)   clipboard.writeText(originalText);
-    else                     clipboard.clear();
+    // Restore the user's original clipboard before any further work
+    if (hadImage)          clipboard.writeImage(originalImage);
+    else if (originalText) clipboard.writeText(originalText);
+    else                   clipboard.clear();
 
     if (!captured || captured.length < MIN_AUTO_LENGTH) return;
 
-    // 30s dedup so re-clicking the same selection doesn't double-save
     const now = Date.now();
     if (captured === this.lastAutoText && now - this.lastAutoTime < DEBOUNCE_SAME_MS) return;
     this.lastAutoText = captured;

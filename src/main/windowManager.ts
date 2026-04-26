@@ -65,7 +65,11 @@ export class WindowManager {
       frame: false, transparent: true, hasShadow: true,
       alwaysOnTop: true, skipTaskbar: true,
       resizable: false, movable: true, show: false,
-      vibrancy: 'hud',                          // true macOS frosted material
+      // 'fullscreen-ui' renders as a unified light-grey glass slab without
+      // the boxy dark "panel" feel that 'hud' gave us. Combined with the
+      // light CSS tint in spotlight-surface, the result is one continuous
+      // glass-morphism surface instead of a glass-over-black-pill sandwich.
+      vibrancy: 'fullscreen-ui',
       visualEffectState: 'active',
       webPreferences: {
         preload: getPreloadPath('floatingPreload'),
