@@ -65,11 +65,13 @@ export class WindowManager {
       frame: false, transparent: true, hasShadow: true,
       alwaysOnTop: true, skipTaskbar: true,
       resizable: false, movable: true, show: false,
-      // 'fullscreen-ui' renders as a unified light-grey glass slab without
-      // the boxy dark "panel" feel that 'hud' gave us. Combined with the
-      // light CSS tint in spotlight-surface, the result is one continuous
-      // glass-morphism surface instead of a glass-over-black-pill sandwich.
-      vibrancy: 'fullscreen-ui',
+      // 'sidebar' = macOS Liquid Glass dark material (the same frosted layer
+      // Apple uses for the Spotlight panel and Notification Center). Pairs
+      // with a translucent dark CSS tint so white text stays readable while
+      // the wallpaper still shows through. Light vibrancy ('fullscreen-ui')
+      // looked good against dark wallpapers but made white text invisible
+      // against bright photos — sidebar fixes that universally.
+      vibrancy: 'sidebar',
       visualEffectState: 'active',
       webPreferences: {
         preload: getPreloadPath('floatingPreload'),

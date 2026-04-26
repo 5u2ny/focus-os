@@ -41,43 +41,47 @@
     -webkit-font-smoothing: antialiased;
     user-select: none;
     -webkit-app-region: no-drag;
-    /* Subtle dark text shadow keeps white text readable over the lighter
-       glass material on bright wallpapers — no need for a heavy dark wash. */
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
   }
 }
 
 @layer components {
-  /* Spotlight-style frosted command bar — pure glass morphism */
-  /* The BrowserWindow uses Electron `vibrancy: 'hud'` for the macOS material;
-     here we paint only a thin tint + crisp white rim so the surface reads as
-     ONE unified glass slab — no more "vibrancy material with a black pill
-     floating inside it" sandwich. Tint is kept low so the native blur shows
-     through; the rim and inner highlight do the work of defining the edge. */
+  /* ─── Liquid Glass surface (Apple macOS 15 Sequoia design language) ─── */
+  /* The BrowserWindow uses Electron `vibrancy: 'sidebar'` (dark NSVisualEffectView
+     material — same as Notification Center). On top we paint:
+     · slight dark tint so white text always has contrast
+     · stronger backdrop-filter for the "deep frosted glass" feel
+     · bright top specular rim (the signature Liquid Glass gleam)
+     · thin white border for crisp edge definition
+     · phase-tinted ambient glow when timer is running
+     · saturated wallpaper colors bleed through via saturate(1.8) */
   .spotlight-surface {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(24px) saturate(1.5);
-    -webkit-backdrop-filter: blur(24px) saturate(1.5);
-    border: 1px solid rgba(255, 255, 255, 0.20);
+    background: rgba(20, 20, 28, 0.55);
+    backdrop-filter: blur(32px) saturate(1.8);
+    -webkit-backdrop-filter: blur(32px) saturate(1.8);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-top-color: rgba(255, 255, 255, 0.28);
     box-shadow:
-      /* Top specular highlight — the signature glass-morphism gleam */
-      inset 0 1px 0 rgba(255, 255, 255, 0.55),
-      /* Soft inner lift */
-      inset 0 0 24px rgba(255, 255, 255, 0.04),
-      /* Subtle bottom shadow for depth */
-      inset 0 -1px 0 rgba(0, 0, 0, 0.15),
-      /* Drop shadow */
-      0 6px 24px rgba(0, 0, 0, 0.22);
+      /* Liquid Glass top specular — bright gleam like light hitting curved glass */
+      inset 0 1.5px 0 rgba(255, 255, 255, 0.55),
+      /* Inner lift — subtle horizontal highlight */
+      inset 0 0 28px rgba(255, 255, 255, 0.04),
+      /* Bottom inner shadow — adds depth */
+      inset 0 -1px 0 rgba(0, 0, 0, 0.30),
+      /* Drop shadow — anchors the surface against the wallpaper */
+      0 10px 32px rgba(0, 0, 0, 0.38),
+      0 2px 6px rgba(0, 0, 0, 0.18);
   }
 
   .spotlight-surface.is-running {
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.55),
-      inset 0 0 24px rgba(255, 255, 255, 0.04),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.15),
-      0 6px 24px rgba(0, 0, 0, 0.22),
-      /* Phase-tinted ambient halo — subtle, not the dominant color */
-      0 0 22px 2px rgba(var(--phase-r), var(--phase-g), var(--phase-b), 0.32);
+      inset 0 1.5px 0 rgba(255, 255, 255, 0.55),
+      inset 0 0 28px rgba(255, 255, 255, 0.04),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.30),
+      0 10px 32px rgba(0, 0, 0, 0.38),
+      0 2px 6px rgba(0, 0, 0, 0.18),
+      /* Phase-tinted ambient halo — wider than before for proper "glow" feel */
+      0 0 30px 4px rgba(var(--phase-r), var(--phase-g), var(--phase-b), 0.30),
+      0 0 60px 12px rgba(var(--phase-r), var(--phase-g), var(--phase-b), 0.12);
   }
 
   .drag-region { -webkit-app-region: drag; }
