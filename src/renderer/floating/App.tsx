@@ -31,7 +31,7 @@ const COLLAPSED = { w: 728, h: 72 }
 const EXPANDED  = { w: 728, h: 460 }
 const ISLAND    = { w: 280, h: 52 }
 const ONBOARD   = { w: 480, h: 520 }
-const SETTINGS  = { w: 480, h: 600 }
+const SETTINGS  = { w: 560, h: 640 }   // wider so the Gmail OAuth stepper has room
 
 type Tab = 'focus' | 'saves' | 'tasks' | 'calendar' | 'inbox'
 

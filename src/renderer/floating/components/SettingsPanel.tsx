@@ -8,6 +8,7 @@ import { Input } from '@shared/ui/input'
 import { cn } from '@shared/lib/utils'
 import {
   X, Timer, Bookmark, Cpu, Mail, Tag, Check, AlertCircle, ExternalLink, Plus, Trash2,
+  KeyRound, FolderPlus, ToggleRight, FileKey, Loader2,
 } from 'lucide-react'
 
 interface Props {
@@ -332,99 +333,109 @@ export function SettingsPanel({ settings, focusSettings, onSave, onClose }: Prop
             )}
 
             {gmailMode === 'oauth' && !hasShippedOAuth && (
-              // No bundled credentials — user provides their own from Google Cloud Console
-              <>
-                <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-3 text-xs text-amber-200">
-                  ⚠ Pure "Sign in with Google" requires the developer to register OAuth credentials once and ship them with the app
-                  (see <code className="px-1 py-0.5 rounded bg-white/[0.06] font-mono text-[10px]">src/main/services/gmail/oauthConfig.ts</code>).
-                  Until that's done, paste your own credentials below — works exactly the same, you just register the OAuth client yourself.
-                </div>
+              // No bundled credentials — user does the 4-step setup once.
+              // Rendered as a visual stepper. Steps auto-mark complete based
+              // on detectable state: clicking the link marks step "visited";
+              // pasting a Client ID marks step 4 effectively done.
+              <div className="space-y-2.5">
+                <p className="text-xs text-white/55 leading-relaxed">
+                  Three-minute one-time setup. Each step opens the right Google Cloud page directly — work top-to-bottom, paste the credentials at the bottom, then sign in.
+                </p>
 
-                <div className="rounded-lg bg-white/[0.03] border border-white/[0.08] p-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-white/45 mb-3">
-                    One-time setup (~3 minutes)
-                  </p>
-                  <ol className="space-y-2.5 text-xs text-white/75">
-                    <li className="flex gap-2">
-                      <span className="phase-text font-bold flex-shrink-0">1.</span>
-                      <span>Open{' '}
-                        <a className="text-sky-400 hover:underline" target="_blank" rel="noreferrer"
-                          href="https://console.cloud.google.com/projectcreate">
-                          Google Cloud Console
-                        </a>
-                        {' '}→ create a new project (any name, e.g. "Focus OS").
-                      </span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="phase-text font-bold flex-shrink-0">2.</span>
-                      <span>Enable the Gmail API at{' '}
-                        <a className="text-sky-400 hover:underline" target="_blank" rel="noreferrer"
-                          href="https://console.cloud.google.com/apis/library/gmail.googleapis.com">
-                          console.cloud.google.com/apis/library/gmail.googleapis.com
-                        </a>{' '}→ Enable.
-                      </span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="phase-text font-bold flex-shrink-0">3.</span>
-                      <span>Configure OAuth consent screen at{' '}
-                        <a className="text-sky-400 hover:underline" target="_blank" rel="noreferrer"
-                          href="https://console.cloud.google.com/apis/credentials/consent">
-                          OAuth consent screen
-                        </a>{' '}→ User Type: <strong>External</strong> → fill app name + your email →
-                        add scope <code className="px-1 py-0.5 rounded bg-white/[0.06] font-mono text-[10px]">https://mail.google.com/</code> →
-                        add yourself as a Test User.
-                      </span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="phase-text font-bold flex-shrink-0">4.</span>
-                      <span>Create credentials at{' '}
-                        <a className="text-sky-400 hover:underline" target="_blank" rel="noreferrer"
-                          href="https://console.cloud.google.com/apis/credentials">
-                          Credentials
-                        </a>{' '}→ Create Credentials → OAuth client ID → Application type: <strong>Desktop app</strong> → name it → Create.
-                        Copy the Client ID + Client Secret it shows you.
-                      </span>
-                    </li>
-                  </ol>
-                </div>
+                <OAuthStep
+                  num={1}
+                  icon={<FolderPlus size={14} />}
+                  title="Create a Google Cloud project"
+                  body={<>Free, no credit card. Name it anything (e.g. <strong>focus-os</strong>).</>}
+                  href="https://console.cloud.google.com/projectcreate"
+                  cta="Open Console"
+                />
+                <OAuthStep
+                  num={2}
+                  icon={<ToggleRight size={14} />}
+                  title="Enable the Gmail API"
+                  body={<>Make sure your new project is selected at the top, then click <strong>Enable</strong>.</>}
+                  href="https://console.cloud.google.com/apis/library/gmail.googleapis.com"
+                  cta="Enable Gmail API"
+                />
+                <OAuthStep
+                  num={3}
+                  icon={<KeyRound size={14} />}
+                  title="Configure OAuth consent screen"
+                  body={<>
+                    User Type: <strong>External</strong> · App name: anything ·
+                    Add scope <code className="px-1 py-0.5 rounded bg-white/[0.06] font-mono text-[10px]">https://mail.google.com/</code> ·
+                    Add yourself as a <strong>Test User</strong> (Audience tab → Test users → Add users)
+                  </>}
+                  href="https://console.cloud.google.com/auth/audience"
+                  cta="Open Audience"
+                />
+                <OAuthStep
+                  num={4}
+                  icon={<FileKey size={14} />}
+                  title="Create OAuth client ID"
+                  body={<>Type: <strong>Desktop app</strong> · Name it · Click Create · Copy the Client ID + Secret you'll paste below.</>}
+                  href="https://console.cloud.google.com/apis/credentials"
+                  cta="Open Credentials"
+                />
 
-                <Section title="Credentials">
-                  {focusSettings?.gmailOauthClientId && (
-                    <div className="rounded-md bg-white/[0.04] border border-white/[0.08] px-3 py-2 mb-2 flex items-center gap-2">
-                      <span className="text-[10px] uppercase tracking-wider text-white/40">Stored Client ID:</span>
-                      <code className="text-[10px] font-mono text-white/70 truncate flex-1">
-                        {focusSettings.gmailOauthClientId}
-                      </code>
+                {/* ── Step 5: Paste credentials + sign in ── */}
+                <div className="rounded-lg bg-white/[0.04] border border-white/[0.10] p-4 space-y-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className={cn(
+                      'flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold flex-shrink-0',
+                      oauthClientId && oauthClientSecret
+                        ? 'phase-bg-soft phase-text'
+                        : 'bg-white/[0.10] text-white/50'
+                    )}>5</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-white/90">Paste credentials & sign in</p>
+                      <p className="text-[11px] text-white/45">Stored encrypted in your macOS Keychain.</p>
+                    </div>
+                  </div>
+
+                  {focusSettings?.gmailOauthClientId && !oauthClientId && (
+                    <div className="rounded-md bg-amber-500/10 border border-amber-500/25 px-3 py-2 flex items-center gap-2">
+                      <AlertCircle size={12} className="text-amber-400 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] uppercase tracking-wider text-amber-200/80">Stored from earlier</p>
+                        <code className="text-[10px] font-mono text-amber-100/85 truncate block">
+                          {focusSettings.gmailOauthClientId}
+                        </code>
+                      </div>
                       <button onClick={handleResetOAuth}
-                        className="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-red-500/15 text-red-300 hover:bg-red-500/25">
-                        Reset
+                        className="text-[10px] uppercase tracking-wider px-2 py-1 rounded bg-red-500/15 text-red-300 hover:bg-red-500/25 flex-shrink-0">
+                        Clear
                       </button>
                     </div>
                   )}
-                  <Field label="Client ID" hint="Looks like: 1234567890-abc...apps.googleusercontent.com">
+
+                  <Field label="Client ID">
                     <Input value={oauthClientId} onChange={e => setOauthClientId(e.target.value)}
-                      placeholder="...apps.googleusercontent.com" />
+                      placeholder="1234567890-abc...apps.googleusercontent.com"
+                      className="font-mono text-[11px]" />
                   </Field>
-                  <Field label="Client Secret" hint="Stored encrypted in macOS Keychain.">
+                  <Field label="Client Secret">
                     <Input type="password" value={oauthClientSecret}
                       onChange={e => setOauthClientSecret(e.target.value)}
-                      placeholder={focusSettings?.gmailOauthClientSecretEncrypted ? '(saved — enter new to update)' : 'GOCSPX-...'} />
+                      placeholder={focusSettings?.gmailOauthClientSecretEncrypted ? '(already stored — paste a new one to replace)' : 'GOCSPX-...'}
+                      className="font-mono text-[11px]" />
                   </Field>
-                  <div className="flex flex-col gap-2 mt-2">
-                    <Button variant="phase" onClick={handleConnectGmailOAuth}
-                      disabled={gmailStatus === 'connecting' || !oauthClientId || !oauthClientSecret || keychainOk === false}>
-                      {gmailStatus === 'connecting'
-                        ? 'Waiting for Google sign-in in browser…'
-                        : gmailStatus === 'ok' ? <><Check size={13} /> Connected</>
-                        : <><ExternalLink size={13} /> Sign in with Google</>}
-                    </Button>
-                    <p className="text-[10px] text-white/35">
-                      Click → opens your browser → sign in to Google → grant Mail access → done.
-                      The OAuth consent screen shows the project name from <strong>your</strong> Google Cloud project — if it says "job board" instead of "focus-os", you pasted the wrong Client ID.
-                    </p>
-                  </div>
-                </Section>
-              </>
+
+                  <Button variant="phase" size="lg" onClick={handleConnectGmailOAuth}
+                    disabled={gmailStatus === 'connecting' || !oauthClientId || !oauthClientSecret || keychainOk === false}
+                    className="w-full justify-center">
+                    {gmailStatus === 'connecting'
+                      ? <><Loader2 size={14} className="animate-spin" /> Waiting for Google sign-in…</>
+                      : gmailStatus === 'ok'
+                      ? <><Check size={14} /> Connected</>
+                      : <><ExternalLink size={14} /> Sign in with Google</>}
+                  </Button>
+                  <p className="text-[10px] text-white/35 leading-relaxed">
+                    The Google consent screen will say <em>"&lt;your project&gt; wants access to your Google Account"</em> — if it shows the wrong project name, the Client ID came from a different project. Use the Clear button above and paste fresh ones.
+                  </p>
+                </div>
+              </div>
             )}
 
             {/* ── App Password mode (legacy — won't work for Workspace) ── */}
@@ -590,6 +601,51 @@ function NumberField({ label, value, min, max, suffix, onChange }:
         {suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/40 pointer-events-none">{suffix}</span>}
       </div>
     </label>
+  )
+}
+
+/**
+ * One step of the Gmail OAuth setup wizard. Numbered badge + icon + title +
+ * body + a "open in browser" button that links to the right Google Cloud page.
+ * Tracks "visited" state in component-local state — clicking the CTA marks the
+ * step ✓ so the user has a sense of progress through the 4-step flow.
+ */
+function OAuthStep({
+  num, icon, title, body, href, cta,
+}: {
+  num: number
+  icon: React.ReactNode
+  title: string
+  body: React.ReactNode
+  href: string
+  cta: string
+}) {
+  const [visited, setVisited] = React.useState(false)
+  return (
+    <div className={cn(
+      'rounded-lg border p-3 transition',
+      visited ? 'bg-emerald-500/[0.04] border-emerald-500/20' : 'bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.05]'
+    )}>
+      <div className="flex items-start gap-2.5">
+        <span className={cn(
+          'flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold flex-shrink-0',
+          visited ? 'bg-emerald-500/20 text-emerald-300' : 'phase-bg-soft phase-text'
+        )}>
+          {visited ? <Check size={12} /> : num}
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-white/55">{icon}</span>
+            <p className="text-sm font-semibold text-white/90">{title}</p>
+          </div>
+          <p className="text-[11px] text-white/55 leading-relaxed">{body}</p>
+        </div>
+        <a href={href} target="_blank" rel="noreferrer" onClick={() => setVisited(true)}
+          className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-white/[0.06] border border-white/[0.10] text-[11px] font-semibold text-white/80 hover:bg-white/[0.12] hover:text-white transition">
+          {cta} <ExternalLink size={11} />
+        </a>
+      </div>
+    </div>
   )
 }
 
